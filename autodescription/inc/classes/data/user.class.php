@@ -8,6 +8,8 @@ namespace The_SEO_Framework\Data;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
+use function \The_SEO_Framework\umemo;
+
 /**
  * The SEO Framework plugin
  * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
@@ -46,7 +48,7 @@ class User {
 	public static function user_has_author_info_cap_on_network( $user ) {
 
 		if ( ! \is_object( $user ) )
-			$user = \get_userdata( $user );
+			$user = static::get_userdata( $user );
 
 		// User is logged out, how did I get here? (nice song btw)
 		if ( ! $user )
@@ -81,5 +83,24 @@ class User {
 		}
 
 		return $user->has_cap( \THE_SEO_FRAMEWORK_AUTHOR_INFO_CAP );
+	}
+
+	/**
+	 * Gets user data by key.
+	 *
+	 * This is an alias of WP Core's `\get_userdata()`, but with proper memoization.
+	 *
+	 * @since 5.1.0
+	 *
+	 * @param int    $user_id The user ID.
+	 * @param string $key     The data to retrieve.
+	 * @return ?mixed The requested user data. Null on failure.
+	 */
+	public static function get_userdata( $user_id, $key ) {
+
+		$userdata = umemo( __METHOD__, null, $user_id )
+				 ?? umemo( __METHOD__, \get_userdata( $user_id ), $user_id );
+
+		return $userdata->$key ?? null;
 	}
 }
