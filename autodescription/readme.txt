@@ -5,7 +5,7 @@ Tags: seo, xml sitemap, google search, open graph, structured data
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4.0
-Stable tag: 5.1.0
+Stable tag: 5.1.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -243,6 +243,14 @@ You can also output these breadcrumbs visually in your theme by [using a shortco
 
 == Changelog ==
 
+### 5.1.2
+
+This patch [resolves another issue](https://theseoframework.com/?p=4380) where saving author meta data could cause an error.
+
+### 5.1.1
+
+This tiny update [resolves issues](https://theseoframework.com/?p=4348) our community found with the release of TSF v5.1.
+
 ### 5.1.0 - Profound
 
 *The lover of wisdom, then, far surpasses the lover of gain. - [Plato](https://www.perseus.tufts.edu/hopper/text?doc=Perseus%3Atext%3A1999.01.0168%3Abook%3D9)*
@@ -253,7 +261,7 @@ You can also output these breadcrumbs visually in your theme by [using a shortco
 * The canonical URL is now tracked in real-time when editing any page or term.
 * You can now block AI trainers and SEO analysis crawlers from using your content.
 * We added a warning for image types that aren't compatible with most social platforms.
-* You can now set a Canonical and Redirect URL for the homepage.
+* You can now set a canonical and redirect URL for the homepage.
 
 **Profound**
 
