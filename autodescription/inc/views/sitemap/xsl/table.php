@@ -6,13 +6,13 @@
 
 namespace The_SEO_Framework;
 
-\defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) or die;
+( \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) ) or die;
 
-// phpcs:disable, WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
+// phpcs:disable WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2021 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2021 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -29,6 +29,7 @@ namespace The_SEO_Framework;
 
 $vars  = [
 	'itemURL' => '<xsl:variable name="itemURL" select="sitemap:loc"/>',
+	// Display only: date + time, drop timezone. Do not change sitemap XML lastmod to match.
 	'lastmod' => '<xsl:variable name="lastmod" select="concat(substring(sitemap:lastmod,0,11),concat(\' \',substring(sitemap:lastmod,12,8)))"/>',
 ];
 $empty = array_fill_keys( [ 'th', 'td' ], '' );
@@ -48,7 +49,7 @@ if ( \The_SEO_Framework\Data\Plugin::get_option( 'sitemaps_modified' ) ) {
 	unset( $vars['lastmod'] );
 }
 
-// phpcs:disable, WordPress.Security.EscapeOutput, output is escaped.
+// phpcs:disable WordPress.Security.EscapeOutput, output is escaped.
 ?>
 <table>
 	<thead>

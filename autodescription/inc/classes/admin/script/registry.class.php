@@ -8,24 +8,28 @@ namespace The_SEO_Framework\Admin\Script;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
 	has_run,
-	umemo,
 	is_headless,
+	umemo,
 };
 
-use \The_SEO_Framework\Data;
-use \The_SEO_Framework\Helper\{
-	Format,
+use The_SEO_Framework\{
+	Data,
+	Data\Filter\Sanitize,
+};
+use The_SEO_Framework\Helper\{
+	Format\Color,
 	Post_Type,
 	Query,
 	Taxonomy,
-	Template
+	Template,
+	User,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2018 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2018 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -56,7 +60,7 @@ use \The_SEO_Framework\Helper\{
  * @see \The_SEO_Framework\Admin\Script\Loader
  * @access private
  */
-class Registry {
+final class Registry {
 
 	/**
 	 * Codes to maintain the internal state of the scripts. This state might not reflect
@@ -94,6 +98,7 @@ class Registry {
 	 *
 	 * @hook admin_enqueue_scripts 0
 	 * @since 5.0.0
+	 * @since 5.2.0 Now registers scripts on profile and user screens, including the users list.
 	 *
 	 * @access private
 	 */
@@ -104,7 +109,16 @@ class Registry {
 			// Notices can be outputted if not entirely headless -- this very method only runs when not entirely headless.
 			|| Data\Plugin::get_site_cache( 'persistent_notices' )
 			|| (
-				! is_headless( 'meta' ) && (
+				   ! is_headless( 'user' )
+				&& Query::is_profile_admin()
+				&& (
+					   User::is_supported()
+					|| ! Query::is_profile_edit()
+				)
+			)
+			|| (
+				   ! is_headless( 'meta' )
+				&& (
 					   ( Query::is_archive_admin() && Taxonomy::is_supported() )
 					|| ( Query::is_singular_admin() && Post_Type::is_supported() )
 				)
@@ -116,15 +130,13 @@ class Registry {
 		 * @param bool $register Whether to register scripts and hooks.
 		 */
 		if ( \apply_filters( 'the_seo_framework_register_scripts', $register ) )
-			static::register_scripts_and_hooks();
+			self::register_scripts_and_hooks();
 	}
 
 	/**
 	 * Registers all scripts and necessary hooks.
 	 *
 	 * @since 5.0.0
-	 *
-	 * @access public
 	 */
 	public static function register_scripts_and_hooks() {
 
@@ -134,25 +146,29 @@ class Registry {
 			Loader::init();
 
 		if ( \did_action( 'in_admin_header' ) )
-			static::footer_enqueue();
+			self::footer_enqueue();
 
 		// These fail when called in the body.
 		\add_action( 'admin_enqueue_scripts', [ Loader::class, 'init' ], 0 );
-		\add_filter( 'admin_body_class', [ static::class, '_add_body_class' ] );
-		\add_action( 'in_admin_header', [ static::class, '_print_tsfjs_script' ] );
+		\add_filter( 'admin_body_class', [ self::class, '_add_body_class' ] );
+		\add_action( 'in_admin_header', [ self::class, '_print_tsfjs_script' ] );
 
-		\add_action( 'admin_enqueue_scripts', [ static::class, '_prepare_admin_scripts' ], 1 ); // Magic number: we likely run at priority 0. Add 1.
-		\add_action( 'admin_footer', [ static::class, '_output_templates' ], 999 ); // Magic number: later is less likely to collide?
+		\add_action( 'admin_enqueue_scripts', [ self::class, '_prepare_admin_scripts' ], 1 ); // Magic number: we likely run at priority 0. Add 1.
+		\add_action( 'admin_footer', [ self::class, '_output_templates' ], 999 ); // Magic number: later is less likely to collide?
 	}
 
 	/**
 	 * Enqueues all known registered scripts, styles, and templates.
 	 *
+	 * @hook admin_enqueue_scripts 10
+	 * @hook wp_enqueue_scripts 10
+	 * @hook admin_footer 998
 	 * @since 3.1.0
 	 */
 	public static function enqueue() {
-		static::_prepare_admin_scripts();
-		static::_output_templates();
+
+		self::_prepare_admin_scripts();
+		self::_output_templates();
 	}
 
 	/**
@@ -166,7 +182,7 @@ class Registry {
 
 		if ( has_run( __METHOD__ ) ) return;
 
-		\add_action( 'admin_footer', [ static::class, 'enqueue' ], 998 ); // Magic number: 1 before output_templates.
+		\add_action( 'admin_footer', [ self::class, 'enqueue' ], 998 ); // Magic number: 1 before output_templates.
 	}
 
 	/**
@@ -175,6 +191,7 @@ class Registry {
 	 * @since 4.0.0
 	 * @since 5.0.0 1. Is now static.
 	 *              2. Now adds a low contrast SEO Bar class.
+	 * @access private
 	 *
 	 * @param string $classes Space-separated list of CSS classes.
 	 * @return string
@@ -190,9 +207,11 @@ class Registry {
 	/**
 	 * Prints the TSF no-js transform script, using ES2015 (ECMA-262).
 	 *
+	 * @hook in_admin_header 10
 	 * @since 4.0.0
 	 * @since 4.0.5 Put the const assignment on front, so it's prone to fail earlier.
 	 * @since 5.0.0 Is now static.
+	 * @access private
 	 */
 	public static function _print_tsfjs_script() {
 		echo "<script>(()=>{const a=0;document.body.classList.replace('tsf-no-js','tsf-js')})()</script>";
@@ -201,27 +220,30 @@ class Registry {
 	/**
 	 * Prepares scripts for output on post edit screens.
 	 *
+	 * @hook admin_enqueue_scripts 1
 	 * @since 3.1.0
 	 * @since 5.0.0 Is now static.
+	 * @access private
 	 */
 	public static function _prepare_admin_scripts() {
-		static::forward_known_scripts();
-		static::autoload_known_scripts();
+
+		self::forward_known_scripts();
+		self::autoload_known_scripts();
 	}
 
 	/**
 	 * Returns the script status of $id for $type.
 	 *
 	 * @since 3.1.0
-	 * @see static::REGISTERED
-	 * @see static::LOADED
+	 * @see self::REGISTERED
+	 * @see self::LOADED
 	 *
 	 * @param string $id   The script ID.
 	 * @param string $type The script type, albeit 'js' or 'css'.
 	 * @return int <bit>
 	 */
 	public static function get_status_of( $id, $type ) {
-		return static::$queue[ $type ][ $id ] ?? 0b0;
+		return self::$queue[ $type ][ $id ] ?? 0b0;
 	}
 
 	/**
@@ -241,9 +263,9 @@ class Registry {
 	 *
 	 *     @type string        $id       The script unique ID.
 	 *     @type string        $type     The script type, either 'js' or 'css'.
-	 *     @type boolean       $hasrtl   Optional. If true, the script will consider .rtl and .rtl.min versions.
+	 *     @type Boolean       $hasrtl   Optional. If true, the script will consider .rtl and .rtl.min versions.
 	 *                                   Default false.
-	 *     @type boolean       $autoload If true, the script will be loaded directly.
+	 *     @type Boolean       $autoload If true, the script will be loaded directly.
 	 *                                   If false, it'll only be registered for dependencies.
 	 *     @type string        $name     The script file name.
 	 *     @type array         $deps     Any script dependencies by name.
@@ -268,13 +290,15 @@ class Registry {
 	 * }
 	 */
 	public static function register( $script ) {
+
 		// This is over 350x faster than a polyfill for `array_is_list()`.
 		if ( isset( $script[0] ) && array_values( $script ) === $script ) {
-			foreach ( $script as $s ) static::register( $s );
+			foreach ( $script as $s ) self::register( $s );
+
 			return;
 		}
 
-		static::$scripts[] = $script;
+		self::$scripts[] = $script;
 	}
 
 	/**
@@ -286,10 +310,11 @@ class Registry {
 	 * @param string $type The script type.
 	 */
 	public static function forward_known_script( $id, $type ) {
-		if ( ! ( static::get_status_of( $id, $type ) & static::REGISTERED ) ) {
-			foreach ( static::$scripts as $s ) {
+
+		if ( ! ( self::get_status_of( $id, $type ) & self::REGISTERED ) ) {
+			foreach ( self::$scripts as $s ) {
 				if ( $s['id'] === $id && $s['type'] === $type )
-					static::forward_script( $s );
+					self::forward_script( $s );
 			}
 		}
 	}
@@ -304,12 +329,12 @@ class Registry {
 	 */
 	public static function enqueue_known_script( $id, $type ) {
 
-		static::forward_known_script( $id, $type );
+		self::forward_known_script( $id, $type );
 
-		$status = static::get_status_of( $id, $type );
+		$status = self::get_status_of( $id, $type );
 
-		if ( ( $status & static::REGISTERED ) && ! ( $status & static::LOADED ) )
-			static::load_script( $id, $type );
+		if ( ( $status & self::REGISTERED ) && ! ( $status & self::LOADED ) )
+			self::load_script( $id, $type );
 	}
 
 	/**
@@ -319,10 +344,13 @@ class Registry {
 	 * @since 5.0.0 Is now static.
 	 */
 	private static function forward_known_scripts() {
+
 		// Register them first to accommodate for dependencies.
-		foreach ( static::$scripts as $s ) {
-			if ( static::get_status_of( $s['id'], $s['type'] ) & static::REGISTERED ) continue;
-			static::forward_script( $s );
+		foreach ( self::$scripts as $s ) {
+			if ( self::get_status_of( $s['id'], $s['type'] ) & self::REGISTERED )
+				continue;
+
+			self::forward_script( $s );
 		}
 	}
 
@@ -333,10 +361,12 @@ class Registry {
 	 * @since 5.0.0 Is now static.
 	 */
 	private static function autoload_known_scripts() {
-		foreach ( static::$scripts as $s ) {
+		foreach ( self::$scripts as $s ) {
 			if ( $s['autoload'] ) {
-				if ( static::get_status_of( $s['id'], $s['type'] ) & static::LOADED ) continue;
-				static::load_script( $s['id'], $s['type'] );
+				if ( self::get_status_of( $s['id'], $s['type'] ) & self::LOADED )
+					continue;
+
+				self::load_script( $s['id'], $s['type'] );
 			}
 		}
 	}
@@ -354,26 +384,27 @@ class Registry {
 
 		switch ( $s['type'] ) {
 			case 'css':
-				\wp_register_style( $s['id'], static::generate_file_url( $s, 'css' ), $s['deps'], $s['ver'], 'all' );
+				\wp_register_style( $s['id'], self::generate_file_url( $s, 'css' ), $s['deps'], $s['ver'], 'all' );
 				isset( $s['inline'] )
-					and \wp_add_inline_style( $s['id'], static::create_inline_css( $s['inline'] ) );
+					and \wp_add_inline_style( $s['id'], self::create_inline_css( $s['inline'] ) );
 				$registered = true;
 				break;
 			case 'js':
-				\wp_register_script( $s['id'], static::generate_file_url( $s, 'js' ), $s['deps'], $s['ver'], true );
+				\wp_register_script( $s['id'], self::generate_file_url( $s, 'js' ), $s['deps'], $s['ver'], true );
 				isset( $s['l10n'] )
 					and \wp_localize_script( $s['id'], $s['l10n']['name'], $s['l10n']['data'] );
 				isset( $s['tmpl'] )
-					and static::register_template( $s['id'], $s['tmpl'] );
+					and self::register_template( $s['id'], $s['tmpl'] );
 				isset( $s['inline'] )
-					and \wp_add_inline_script( $s['id'], static::create_inline_js( $s['inline'] ) );
+					and \wp_add_inline_script( $s['id'], self::create_inline_js( $s['inline'] ) );
 				$registered = true;
 		}
 
 		if ( $registered ) {
-			isset( static::$queue[ $s['type'] ][ $s['id'] ] )
-				and static::$queue[ $s['type'] ][ $s['id'] ] |= static::REGISTERED
-				 or static::$queue[ $s['type'] ][ $s['id'] ]  = static::REGISTERED;
+			// Add to bitwise if exists, otherwise, write the variable.
+			isset( self::$queue[ $s['type'] ][ $s['id'] ] )
+				? ( self::$queue[ $s['type'] ][ $s['id'] ] |= self::REGISTERED )
+				: ( self::$queue[ $s['type'] ][ $s['id'] ]  = self::REGISTERED );
 		}
 	}
 
@@ -387,7 +418,8 @@ class Registry {
 	 */
 	private static function load_script( $id, $type ) {
 
-		if ( ! ( static::get_status_of( $id, $type ) & static::REGISTERED ) ) return;
+		if ( ! ( self::get_status_of( $id, $type ) & self::REGISTERED ) )
+			return;
 
 		$loaded = false;
 
@@ -402,9 +434,10 @@ class Registry {
 		}
 
 		if ( $loaded ) {
-			isset( static::$queue[ $type ][ $id ] )
-				and static::$queue[ $type ][ $id ] |= static::LOADED
-				 or static::$queue[ $type ][ $id ]  = static::LOADED;
+			// Add to bitwise if exists, otherwise, write the variable.
+			isset( self::$queue[ $type ][ $id ] )
+				? ( self::$queue[ $type ][ $id ] |= self::LOADED )
+				: ( self::$queue[ $type ][ $id ]  = self::LOADED );
 		}
 	}
 
@@ -456,7 +489,7 @@ class Registry {
 			$out .= \sprintf(
 				'%s{%s}',
 				$selector,
-				implode( ';', static::convert_color_css_declaration( $declaration ) )
+				implode( ';', self::convert_color_css_declaration( $declaration ) ),
 			);
 		}
 
@@ -488,6 +521,11 @@ class Registry {
 	 * @since 3.1.0
 	 * @since 5.0.0 1. Is now static.
 	 *              2. Renamed from `convert_color_css`.
+	 * @since 5.2.0 1. Now registers the admin color scheme if not yet registered.
+	 *              2. Now uses cached user data for improved admin performance.
+	 *              3. Added support for WordPress 7.0 admin color schemes.
+	 *              4. Now sanitizes scheme colors to hexadecimal before inline CSS.
+	 *              5. Now falls back to the 'modern' scheme. WordPress 7.0 is required.
 	 * @link <https://make.wordpress.org/core/2021/02/23/standardization-of-wp-admin-colors-in-wordpress-5-7/>
 	 *
 	 * @param array $css The CSS to convert.
@@ -498,32 +536,38 @@ class Registry {
 		$conversions = umemo( __METHOD__ . '/conversions' );
 
 		if ( ! $conversions ) {
-			$_scheme = \get_user_option( 'admin_color' ) ?: 'fresh';
-			$_colors = $GLOBALS['_wp_admin_css_colors'];
+			$_scheme = Data\User::get_userdata(
+				Query::get_current_user_id(),
+				'admin_color',
+			) ?: 'modern';
 
-			if (
-				   ! \is_array( $_colors[ $_scheme ]->colors ?? null )
-				|| \count( $_colors[ $_scheme ]->colors ) < 4 // unexpected scheme, ignore and override.
-			) {
-				$_colors = [
-					'#222',
-					'#333',
-					'#0073aa',
-					'#00a0d2',
-				];
-			} else {
-				$_colors = $_colors[ $_scheme ]->colors;
-			}
+			// register_admin_color_schemes runs on admin_init; but we may want to convert colors elsewhere.
+			if ( empty( $GLOBALS['_wp_admin_css_colors'] ) )
+				\register_admin_color_schemes();
+
+			$_colors = $GLOBALS['_wp_admin_css_colors'][ $_scheme ]->colors ?? null;
+
+			if ( ! \is_array( $_colors ) || \count( $_colors ) < 3 )
+				$_colors = [ '1e1e1e', '3858e9', '7b90ff' ]; // Default to 'modern' scheme colors if something's wrong.
+
+			// When the scheme lacks a 4th color, duplicate the background into the accent slot, shifting the rest down by one.
+			isset( $_colors[3] ) or array_unshift( $_colors, $_colors[0] );
+
+			// Modern scheme in that slot order. A non-hex slot cannot break out of the style declaration.
+			$_fallbacks = [ '1e1e1e', '1e1e1e', '3858e9', '7b90ff' ];
+
+			foreach ( [ 0, 1, 2, 3 ] as $i )
+				$_colors[ $i ] = Sanitize::rgb_hex( $_colors[ $i ] ?? '' ) ?: $_fallbacks[ $i ];
 
 			$_conversion_table = [
-				'{{$bg}}'               => $_colors[0],
-				'{{$rel_bg}}'           => '#' . Format\Color::get_relative_fontcolor( $_colors[0] ),
-				'{{$bg_accent}}'        => $_colors[1],
-				'{{$rel_bg_accent}}'    => '#' . Format\Color::get_relative_fontcolor( $_colors[1] ),
-				'{{$color}}'            => $_colors[2],
-				'{{$rel_color}}'        => '#' . Format\Color::get_relative_fontcolor( $_colors[2] ),
-				'{{$color_accent}}'     => $_colors[3],
-				'{{$rel_color_accent}}' => '#' . Format\Color::get_relative_fontcolor( $_colors[3] ),
+				'{{$bg}}'               => '#' . $_colors[0],
+				'{{$rel_bg}}'           => '#' . Color::get_relative_fontcolor( $_colors[0] ),
+				'{{$bg_accent}}'        => '#' . $_colors[1],
+				'{{$rel_bg_accent}}'    => '#' . Color::get_relative_fontcolor( $_colors[1] ),
+				'{{$color}}'            => '#' . $_colors[2],
+				'{{$rel_color}}'        => '#' . Color::get_relative_fontcolor( $_colors[2] ),
+				'{{$color_accent}}'     => '#' . $_colors[3],
+				'{{$rel_color_accent}}' => '#' . Color::get_relative_fontcolor( $_colors[3] ),
 			];
 
 			$conversions = umemo(
@@ -555,12 +599,13 @@ class Registry {
 	 * }
 	 */
 	private static function register_template( $id, $templates ) {
+
 		// Wrap template if it's only one on the base.
 		if ( isset( $templates['file'] ) )
 			$templates = [ $templates ];
 
 		foreach ( $templates as $t ) {
-			static::$templates[ $id ][] = [
+			self::$templates[ $id ][] = [
 				$t['file'],
 				$t['args'] ?? [],
 			];
@@ -573,16 +618,19 @@ class Registry {
 	 * The template will only be outputted when the related script is too.
 	 * The loop will only run when templates are registered.
 	 *
+	 * @hook admin_footer 999
 	 * @since 3.1.0
 	 * @since 3.2.2 Now clears outputted templates, so to prevent duplications.
 	 * @since 4.1.2 Now clears templates right before outputting them, so to prevent a plausible infinite loop.
 	 * @since 5.0.0 Is now static.
+	 * @access private
 	 */
 	public static function _output_templates() {
-		foreach ( static::$templates as $id => $templates ) {
+
+		foreach ( self::$templates as $id => $templates ) {
 			if ( \wp_script_is( $id, 'enqueued' ) ) { // This list retains scripts after they're outputted.
 				// Unset template before the loop, to prevent an infinite loop.
-				unset( static::$templates[ $id ] );
+				unset( self::$templates[ $id ] );
 
 				foreach ( $templates as $t )
 					Template::output_absolute_view( $t[0], $t[1] );

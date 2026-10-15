@@ -8,15 +8,15 @@ namespace The_SEO_Framework\Admin\Notice;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
-	Data,
-	Helper\Query,
-	Helper\Template,
+use The_SEO_Framework\Data;
+use The_SEO_Framework\Helper\{
+	Query,
+	Template,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -120,7 +120,7 @@ class Persistent {
 	 *
 	 * @since 4.1.0
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
-	 *              2. The second paremeter is no longer passed by reference.
+	 *              2. The second parameter is no longer passed by reference.
 	 *
 	 * @param string $key   The notice key.
 	 * @param int    $count The number of counts the notice has left.
@@ -134,7 +134,7 @@ class Persistent {
 		--$count;
 
 		if ( ! $count ) {
-			static::clear_notice( $key );
+			self::clear_notice( $key );
 		} else {
 
 			$notices = Data\Plugin::get_site_cache( 'persistent_notices' );
@@ -144,7 +144,7 @@ class Persistent {
 				Data\Plugin::update_site_cache( 'persistent_notices', $notices );
 			} else {
 				// Notice didn't conform. Remove it.
-				static::clear_notice( $key );
+				self::clear_notice( $key );
 			}
 		}
 	}
@@ -180,7 +180,7 @@ class Persistent {
 	}
 
 	/**
-	 * Returns the snaitized notice action key.
+	 * Returns the sanitized notice action key.
 	 *
 	 * @since 4.1.0
 	 * @since 4.1.4 1. Now 'public', marked private.
@@ -199,6 +199,7 @@ class Persistent {
 	/**
 	 * Outputs registered dismissible persistent notice.
 	 *
+	 * @hook admin_notices 10
 	 * @since 4.1.0
 	 * @since 4.1.2 Now only ignores timeout values of -1 to test against.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
@@ -207,8 +208,8 @@ class Persistent {
 	 */
 	public static function _output_notices() {
 
-		$notices    = Data\Plugin::get_site_cache( 'persistent_notices' ) ?? [];
-		$screenbase = \get_current_screen()->base ?? '';
+		$notices     = Data\Plugin::get_site_cache( 'persistent_notices' ) ?? [];
+		$screen_base = \get_current_screen()->base ?? '';
 
 		// Ideally, we don't want to output more than one on no-js. Alas, we can't anticipate the importance and order of the notices.
 		foreach ( $notices as $key => $notice ) {
@@ -217,31 +218,34 @@ class Persistent {
 			if (
 				   ! \current_user_can( $cond['capability'] )
 				|| ( $cond['user'] && Query::get_current_user_id() !== $cond['user'] )
-				|| ( $cond['screens'] && ! \in_array( $screenbase, $cond['screens'], true ) )
-				|| ( $cond['excl_screens'] && \in_array( $screenbase, $cond['excl_screens'], true ) )
-			) continue;
+				|| ( $cond['screens'] && ! \in_array( $screen_base, $cond['screens'], true ) )
+				|| ( $cond['excl_screens'] && \in_array( $screen_base, $cond['excl_screens'], true ) )
+			) {
+				continue;
+			}
 
 			if ( -1 !== $cond['timeout'] && $cond['timeout'] < time() ) {
-				static::clear_notice( $key );
+				self::clear_notice( $key );
 				continue;
 			}
 
 			Template::output_view( 'notice/persistent', $notice['message'], $key, $notice['args'] );
 
-			static::count_down_notice( $key, $cond['count'] );
+			self::count_down_notice( $key, $cond['count'] );
 		}
 	}
 
 	/**
 	 * Clears persistent notice on user request (clicked Dismiss icon) via the no-JS form.
 	 *
+	 * @hook admin_init 10
 	 * @since 4.1.0
 	 * @since 5.0.0 Moved from `\The_SEO_Framework\Load`.
 	 * @access private
 	 */
 	public static function _dismiss_notice() {
 
-		// phpcs:ignore, WordPress.Security.NonceVerification.Missing -- We require the POST data to find locally stored nonces.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- We require the POST data to find locally stored nonces.
 		$key = \sanitize_key( $_POST['tsf-notice-submit'] ?? '' );
 
 		if ( ! $key ) return;
@@ -254,11 +258,11 @@ class Persistent {
 		if (
 			   empty( $_POST['tsf_notice_nonce'] )
 			|| ! \current_user_can( $notices[ $key ]['conditions']['capability'] )
-			|| ! \wp_verify_nonce( $_POST['tsf_notice_nonce'], static::_get_dismiss_nonce_action( $key ) )
+			|| ! \wp_verify_nonce( $_POST['tsf_notice_nonce'], self::_get_dismiss_nonce_action( $key ) )
 		) {
 			\wp_die( -1, 403 );
 		}
 
-		static::clear_notice( $key );
+		self::clear_notice( $key );
 	}
 }

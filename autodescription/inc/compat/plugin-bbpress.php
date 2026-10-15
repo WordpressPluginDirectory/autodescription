@@ -2,17 +2,25 @@
 /**
  * @package The_SEO_Framework\Compat\Plugin\bbPress
  * @subpackage The_SEO_Framework\Compatibility
+ * @access private
  */
 
 namespace The_SEO_Framework;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\normalize_generation_args;
+use function The_SEO_Framework\{
+	get_query_type_from_args,
+	normalize_generation_args,
+};
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
+	Data,
 	Data\Filter\Sanitize,
-	Helper\Query,
+};
+use The_SEO_Framework\Helper\{
+	Compatibility,
+	Query,
 };
 
 /**
@@ -22,11 +30,11 @@ use \The_SEO_Framework\{
  */
 \add_filter( 'bbp_title', [ Front\Title::class, 'set_document_title' ], 99 );
 
-\add_filter( 'the_seo_framework_title_from_generation', __NAMESPACE__ . '\\_bbpress_filter_title', 10, 2 );
-\add_filter( 'the_seo_framework_seo_column_keys_order', __NAMESPACE__ . '\\_bbpress_filter_order_keys' );
-\add_filter( 'the_seo_framework_do_adjust_archive_query', __NAMESPACE__ . '\\_bbpress_filter_do_adjust_query', 10, 2 );
-\add_filter( 'the_seo_framework_robots_meta_array', __NAMESPACE__ . '\\_bbpress_filter_robots', 10, 2 );
-\add_action( 'the_seo_framework_seo_bar', __NAMESPACE__ . '\\_assert_bbpress_noindex_defaults_seo_bar', 10, 2 );
+\add_filter( 'the_seo_framework_title_from_generation', __NAMESPACE__ . '\_bbpress_filter_title', 10, 2 );
+\add_filter( 'the_seo_framework_seo_column_keys_order', __NAMESPACE__ . '\_bbpress_filter_order_keys' );
+\add_filter( 'the_seo_framework_do_adjust_archive_query', __NAMESPACE__ . '\_bbpress_filter_do_adjust_query', 10, 2 );
+\add_filter( 'the_seo_framework_robots_meta_array', __NAMESPACE__ . '\_bbpress_filter_robots', 10, 2 );
+\add_action( 'the_seo_framework_seo_bar', __NAMESPACE__ . '\_assert_bbpress_noindex_defaults_seo_bar', 10, 2 );
 
 /**
  * Override's The SEO Framework's auto-generated title with bbPress's on bbPress queries.
@@ -44,9 +52,9 @@ use \The_SEO_Framework\{
  * @source bbp_title()
  * @NOTE Do NOT call `bbp_title()` or apply filter `bbptitle` here, it'll cause an infinite loop.
  *
- * @param string     $title The title.
- * @param array|null $args  The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
- *                          Is null when the query is auto-determined.
+ * @param string $title The title.
+ * @param ?array $args  The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
+ *                      Is null when the query is auto-determined.
  * @return string The corrected bbPress title on bbPress pages.
  */
 function _bbpress_filter_title( $title, $args ) {
@@ -55,148 +63,96 @@ function _bbpress_filter_title( $title, $args ) {
 		   isset( $args )
 		|| ! \function_exists( 'is_bbpress' )
 		|| ! \is_bbpress()
-	) return $title;
+	) {
+		return $title;
+	}
 
-	// phpcs:disable, Squiz.Commenting.BlockComment, Generic.WhiteSpace.ScopeIndent, WordPress.WP.I18n, Generic.Formatting.MultipleStatementAlignment -- Not my code.
-
-	// Title array
+	// phpcs:disable WordPress.WP.I18n.MissingTranslatorsComment, WordPress.WP.I18n.TextDomainMismatch -- Not my code.
 	$new_title = [];
 
-	/** Archives **************************************************************/
-
-	// Forum Archive
 	if ( \bbp_is_forum_archive() ) {
 		$new_title['text'] = \bbp_get_forum_archive_title();
-
-	// Topic Archive
 	} elseif ( \bbp_is_topic_archive() ) {
 		$new_title['text'] = \bbp_get_topic_archive_title();
-
-	/** Edit ******************************************************************/
-
-	// Forum edit page
 	} elseif ( \bbp_is_forum_edit() ) {
 		$new_title['text']   = \bbp_get_forum_title();
 		$new_title['format'] = \esc_attr__( 'Forum Edit: %s', 'bbpress' );
-
-	// Topic edit page
 	} elseif ( \bbp_is_topic_edit() ) {
 		$new_title['text']   = \bbp_get_topic_title();
 		$new_title['format'] = \esc_attr__( 'Topic Edit: %s', 'bbpress' );
-
-	// Reply edit page
 	} elseif ( \bbp_is_reply_edit() ) {
 		$new_title['text']   = \bbp_get_reply_title();
 		$new_title['format'] = \esc_attr__( 'Reply Edit: %s', 'bbpress' );
-
-	// Topic tag edit page
 	} elseif ( \bbp_is_topic_tag_edit() ) {
 		$new_title['text']   = \bbp_get_topic_tag_name();
 		$new_title['format'] = \esc_attr__( 'Topic Tag Edit: %s', 'bbpress' );
-
-	/** Singles ***************************************************************/
-
-	// Forum page
 	} elseif ( \bbp_is_single_forum() ) {
 		$new_title['text']   = \bbp_get_forum_title();
 		$new_title['format'] = \esc_attr__( 'Forum: %s', 'bbpress' );
-
-	// Topic page
 	} elseif ( \bbp_is_single_topic() ) {
 		$new_title['text']   = \bbp_get_topic_title();
 		$new_title['format'] = \esc_attr__( 'Topic: %s', 'bbpress' );
-
-	// Replies
 	} elseif ( \bbp_is_single_reply() ) {
-		$new_title['text']   = \bbp_get_reply_title();
-
-	// Topic tag page
+		$new_title['text'] = \bbp_get_reply_title();
 	} elseif ( \bbp_is_topic_tag() || \get_query_var( 'bbp_topic_tag' ) ) {
 		$new_title['text']   = \bbp_get_topic_tag_name();
 		$new_title['format'] = \esc_attr__( 'Topic Tag: %s', 'bbpress' );
-
-	/** Users *****************************************************************/
-
-	// Profile page
 	} elseif ( \bbp_is_single_user() ) {
 
 		// Is user viewing their own profile?
 		$is_user_home = \bbp_is_user_home();
 
-		// User topics created
 		if ( \bbp_is_single_user_topics() ) {
 			if ( true === $is_user_home ) {
 				$new_title['text'] = \esc_attr__( 'Your Topics', 'bbpress' );
 			} else {
-				$new_title['text'] = \get_userdata( \bbp_get_user_id() )->display_name;
+				$new_title['text'] = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
 				/* translators: user's display name */
 				$new_title['format'] = \esc_attr__( "%s's Topics", 'bbpress' );
 			}
-
-		// User replies created
 		} elseif ( \bbp_is_single_user_replies() ) {
 			if ( true === $is_user_home ) {
 				$new_title['text'] = \esc_attr__( 'Your Replies', 'bbpress' );
 			} else {
-				$new_title['text'] = \get_userdata( \bbp_get_user_id() )->display_name;
+				$new_title['text'] = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
 				/* translators: user's display name */
 				$new_title['format'] = \esc_attr__( "%s's Replies", 'bbpress' );
 			}
-
-		// User favorites
 		} elseif ( \bbp_is_favorites() ) {
 			if ( true === $is_user_home ) {
 				$new_title['text'] = \esc_attr__( 'Your Favorites', 'bbpress' );
 			} else {
-				$new_title['text'] = \get_userdata( \bbp_get_user_id() )->display_name;
+				$new_title['text'] = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
 				/* translators: user's display name */
 				$new_title['format'] = \esc_attr__( "%s's Favorites", 'bbpress' );
 			}
-
-		// User subscriptions
 		} elseif ( \bbp_is_subscriptions() ) {
 			if ( true === $is_user_home ) {
 				$new_title['text'] = \esc_attr__( 'Your Subscriptions', 'bbpress' );
 			} else {
-				$new_title['text'] = \get_userdata( \bbp_get_user_id() )->display_name;
+				$new_title['text'] = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
 				/* translators: user's display name */
 				$new_title['format'] = \esc_attr__( "%s's Subscriptions", 'bbpress' );
 			}
-
-		// User "home"
+		} elseif ( true === $is_user_home ) {
+			$new_title['text'] = \esc_attr__( 'Your Profile', 'bbpress' );
 		} else {
-			if ( true === $is_user_home ) {
-				$new_title['text'] = \esc_attr__( 'Your Profile', 'bbpress' );
-			} else {
-				$new_title['text'] = \get_userdata( \bbp_get_user_id() )->display_name;
-				/* translators: user's display name */
-				$new_title['format'] = \esc_attr__( "%s's Profile", 'bbpress' );
-			}
+			$new_title['text'] = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
+			/* translators: user's display name */
+			$new_title['format'] = \esc_attr__( "%s's Profile", 'bbpress' );
 		}
-
-	// Profile edit page
 	} elseif ( \bbp_is_single_user_edit() ) {
-
-		// Current user
 		if ( \bbp_is_user_home_edit() ) {
-			$new_title['text']   = \esc_attr__( 'Edit Your Profile', 'bbpress' );
-
-		// Other user
+			// Current user
+			$new_title['text'] = \esc_attr__( 'Edit Your Profile', 'bbpress' );
 		} else {
-			$new_title['text']   = \get_userdata( \bbp_get_user_id() )->display_name;
+			// Other user
+			$new_title['text']   = Data\User::get_userdata( \bbp_get_user_id(), 'display_name' );
 			$new_title['format'] = \esc_attr__( "Edit %s's Profile", 'bbpress' );
 		}
-
-	/** Views *****************************************************************/
-
-	// Views
 	} elseif ( \bbp_is_single_view() ) {
 		$new_title['text']   = \bbp_get_view_title();
 		$new_title['format'] = \esc_attr__( 'View: %s', 'bbpress' );
-
-	/** Search ****************************************************************/
-
-	// Search
 	} elseif ( \bbp_is_search() ) {
 		$new_title['text'] = \bbp_get_search_title();
 	}
@@ -217,15 +173,24 @@ function _bbpress_filter_title( $title, $args ) {
 	// Get the formatted raw title
 	$new_title = \sprintf( $new_title['format'], $new_title['text'] );
 
-	// Filter the raw title.
-	$new_title = \apply_filters( 'bbp_raw_title', $new_title, $sep = '&raquo;', $seplocation = '' ); // phpcs:ignore,VariableAnalysis -- readability.
+	/**
+	 * @since bbPress 2.0.0
+	 * @param string $new_title   The raw title.
+	 * @param string $title       The original title.
+	 * @param string $sep         The title separator.
+	 * @param string $seplocation The title separator location.
+	 */
+	$new_title = \apply_filters(
+		'bbp_raw_title',
+		$new_title,
+		'&raquo;',
+		'',
+	);
 
-	// Compare new title with original title
-	if ( $new_title === $title ) {
+	if ( $new_title === $title )
 		return $title;
-	}
 
-	// phpcs:enable, Squiz.Commenting.BlockComment, Generic.WhiteSpace.ScopeIndent, WordPress.WP.I18n, Generic.Formatting.MultipleStatementAlignment -- Not my code.
+	// phpcs:enable WordPress.WP.I18n.MissingTranslatorsComment, WordPress.WP.I18n.TextDomainMismatch -- Not my code.
 
 	return $new_title;
 }
@@ -235,7 +200,6 @@ function _bbpress_filter_title( $title, $args ) {
  *
  * @hook the_seo_framework_seo_column_keys_order 10
  * @since 2.8.0
- * @access private
  *
  * @param array $current_keys The current column keys TSF looks for.
  * @return array Expanded keyset.
@@ -256,14 +220,13 @@ function _bbpress_filter_order_keys( $current_keys = [] ) {
  *
  * @hook the_seo_framework_do_adjust_archive_query 10
  * @since 3.0.3
- * @access private
  * @link <https://bbpress.trac.wordpress.org/ticket/2607> (regression)
  *
- * @param bool      $do       Whether to adjust the query.
+ * @param bool      $adjust   Whether to adjust the query.
  * @param \WP_Query $wp_query The query.
  * @return bool
  */
-function _bbpress_filter_do_adjust_query( $do, $wp_query ) {
+function _bbpress_filter_do_adjust_query( $adjust, $wp_query ) {
 
 	if (
 		   isset( $wp_query->query['post_type'] )
@@ -271,10 +234,10 @@ function _bbpress_filter_do_adjust_query( $do, $wp_query ) {
 		&& \function_exists( 'is_bbpress' )
 		&& \is_bbpress()
 	) {
-		$do = false;
+		$adjust = false;
 	}
 
-	return $do;
+	return $adjust;
 }
 
 /**
@@ -284,9 +247,8 @@ function _bbpress_filter_do_adjust_query( $do, $wp_query ) {
  *
  * @hook the_seo_framework_robots_meta_array 10
  * @since 4.2.8
- * @access private
  *
- * @param array      $meta    {
+ * @param array  $meta {
  *     The parsed robots meta.
  *
  *     @type string $noindex           Ideally be empty or 'noindex'
@@ -296,25 +258,26 @@ function _bbpress_filter_do_adjust_query( $do, $wp_query ) {
  *     @type string $max_image_preview Ideally be empty or 'max-image-preview:<none|standard|large>'
  *     @type string $max_video_preview Ideally be empty or 'max-video-preview:<R>=-1>'
  * }
- * @param array|null $args The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
- *                         Is null when the query is auto-determined.
+ * @param ?array $args The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
+ *                     Is null when the query is auto-determined.
  * @return array
  */
 function _bbpress_filter_robots( $meta, $args ) {
 
 	if ( isset( $args ) ) {
-		if ( ! Helper\Compatibility::can_i_use( [
+		if ( ! Compatibility::can_i_use( [
 			'functions' => [
 				'bbp_get_forum_post_type',
 				'bbp_get_topic_post_type',
 				'bbp_get_reply_post_type',
 			],
-		] ) ) return $meta;
+		] ) ) {
+			return $meta;
+		}
 
 		normalize_generation_args( $args );
 
-		// Custom query, back-end or sitemap.
-		if ( empty( $args['pta'] ) && empty( $args['tax'] ) && empty( $args['uid'] ) ) {
+		if ( 'single' === get_query_type_from_args( $args ) ) {
 			switch ( \get_post_type( $args['id'] ) ) {
 				case \bbp_get_forum_post_type():
 					$forum_id = $args['id'];
@@ -325,13 +288,15 @@ function _bbpress_filter_robots( $meta, $args ) {
 			}
 		}
 	} else {
-		if ( ! Helper\Compatibility::can_i_use( [
+		if ( ! Compatibility::can_i_use( [
 			'functions' => [
 				'bbp_is_single_forum',
 				'bbp_is_single_topic',
 				'bbp_is_single_reply',
 			],
-		] ) ) return $meta;
+		] ) ) {
+			return $meta;
+		}
 
 		// Front-end
 		if ( \bbp_is_single_forum() ) {
@@ -354,7 +319,9 @@ function _bbpress_filter_robots( $meta, $args ) {
  *
  * @hook the_seo_framework_seo_bar 10
  * @since 4.2.8
- * @access private
+ * @since 5.2.0 1. Now removes the indexing override assessment.
+ *              2. Now compares the forum post type with `bbp_get_forum_post_type()`.
+ *              3. Now reads the post type from the SEO Bar query cache.
  *
  * @param string $interpreter The interpreter class name.
  * @param object $builder     The builder's class instance.
@@ -363,22 +330,27 @@ function _assert_bbpress_noindex_defaults_seo_bar( $interpreter, $builder ) {
 
 	if ( $interpreter::$query['tax'] ) return;
 
-	if ( ! Helper\Compatibility::can_i_use( [
+	if ( ! Compatibility::can_i_use( [
 		'functions' => [
 			'bbp_get_forum_post_type',
 			'bbp_get_topic_post_type',
 			'bbp_get_reply_post_type',
 			'bbp_is_forum_public',
 		],
-	] ) ) return;
+	] ) ) {
+		return;
+	}
 
 	$items = $interpreter::collect_seo_bar_items();
 
 	// Don't do anything if there's a blocking redirect.
 	if ( ! empty( $items['redirect']['meta']['blocking'] ) ) return;
 
-	switch ( $interpreter::$query['post_type'] ) {
-		case \bbp_get_forum_post_type():
+	$forum_post_type = \bbp_get_forum_post_type();
+	$post_type       = $builder->get_query_cache()['states']['posttype'] ?? '';
+
+	switch ( $post_type ) {
+		case $forum_post_type:
 			$forum_id = $interpreter::$query['id'];
 			break;
 		case \bbp_get_topic_post_type():
@@ -393,12 +365,12 @@ function _assert_bbpress_noindex_defaults_seo_bar( $interpreter, $builder ) {
 		? $interpreter::STATE_OKAY
 		: $interpreter::STATE_UNKNOWN;
 
-	if ( 'forum' === $interpreter::$query['post_type'] ) {
+	if ( $forum_post_type === $post_type ) {
 		$index_item['assess']['notpublic'] = \__( 'This is not a public forum.', 'autodescription' );
 	} else {
 		$index_item['assess']['notpublic'] = \__( 'This page is not part of a public forum.', 'autodescription' );
 	}
 
 	// No amount of overriding will fix this -- the forum/topic/reply is publicly unreachable.
-	unset( $index_item['override'] );
+	unset( $index_item['assess']['override'] );
 }

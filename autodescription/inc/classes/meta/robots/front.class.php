@@ -8,21 +8,23 @@ namespace The_SEO_Framework\Meta\Robots;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use const \The_SEO_Framework\{
+use const The_SEO_Framework\{
 	ROBOTS_IGNORE_SETTINGS,
 	ROBOTS_IGNORE_PROTECTION,
 };
 
-use \The_SEO_Framework\Data;
-use \The_SEO_Framework\Meta\Robots; // Yes, it is legal to share class and namespaces.
-use \The_SEO_Framework\Helper\{
+use The_SEO_Framework\{
+	Data,
+	Meta\Robots, // Yes, it is legal to share class and namespaces.
+};
+use The_SEO_Framework\Helper\{
 	Query,
 	Taxonomy,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -46,9 +48,9 @@ use \The_SEO_Framework\Helper\{
  */
 final class Front extends Factory {
 
-	// phpcs:disable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable -- You don't love PHP7.
-	// phpcs:disable, PSR2.ControlStructures.SwitchDeclaration.TerminatingComment -- You hate goto.
-	// phpcs:disable, Generic.WhiteSpace.ScopeIndent.IncorrectExact -- You hate gotoo.
+	// phpcs:disable VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable -- You don't love PHP7.
+	// phpcs:disable PSR2.ControlStructures.SwitchDeclaration.TerminatingComment -- You hate goto.
+	// phpcs:disable Generic.WhiteSpace.ScopeIndent.IncorrectExact -- You hate gotoo.
 	/**
 	 * Generates robots assertions for no[index|archive|follow].
 	 *
@@ -57,6 +59,7 @@ final class Front extends Factory {
 	 * @since 4.2.0
 	 * @since 4.2.5 1. Removed needlessly duplicate homepage test.
 	 *              2. Moved archive pagination check to index_protection.
+	 * @since 5.2.0 Now reads the per-author robots qubit from user meta.
 	 * @generator
 	 *
 	 * @param string $type The robots generator type (noindex, nofollow...).
@@ -66,7 +69,7 @@ final class Front extends Factory {
 		$asserting_noindex = 'noindex' === $type;
 
 		// We assert options here for a jump to meta_settings might be unaware.
-		meta_settings: if ( ! ( static::$options & ROBOTS_IGNORE_SETTINGS ) ) {
+		meta_settings: if ( ! ( static::$options & ROBOTS_IGNORE_SETTINGS ) ) { // static: allow overrides
 
 			$qubit = null;
 
@@ -76,6 +79,8 @@ final class Front extends Factory {
 				$qubit = (int) Data\Plugin\Post::get_meta_item( "_genesis_$type" );
 			} elseif ( \is_post_type_archive() ) {
 				$qubit = (int) Data\Plugin\PTA::get_meta_item( $type );
+			} elseif ( Query::is_author() ) {
+				$qubit = (int) Data\Plugin\User::get_current_post_author_meta_item( $type );
 			}
 
 			switch ( isset( $qubit ) ) {
@@ -98,13 +103,13 @@ final class Front extends Factory {
 			}
 		}
 
-		globals:
+		globals: {
 			yield 'globals_site' => (bool) Data\Plugin::get_option( "site_$type" );
 
 			if ( Query::is_real_front_page() ) {
 				yield 'globals_homepage' => (bool) Data\Plugin::get_option( "homepage_$type" );
 			} else {
-				$asserting_noindex and yield from static::assert_noindex_query_pass( '404' );
+				$asserting_noindex and yield from static::assert_noindex_query_pass( '404' ); // static: allow overrides
 
 				if ( Query::is_archive() ) {
 					if ( Query::is_author() ) {
@@ -134,19 +139,20 @@ final class Front extends Factory {
 			} elseif ( Query::is_singular() ) {
 				yield 'globals_post_type' => Robots::is_post_type_robots_set( $type, Query::get_current_post_type() );
 			}
+		}
 
 		// We assert options here for a jump to index_protection might be unaware.
-		index_protection: if ( $asserting_noindex && ! ( static::$options & ROBOTS_IGNORE_PROTECTION ) ) {
+		index_protection: if ( $asserting_noindex && ! ( static::$options & ROBOTS_IGNORE_PROTECTION ) ) { // static: allow overrides
 			if ( Query::is_real_front_page() ) {
-				yield from static::assert_noindex_query_pass( 'paged_home' );
+				yield from static::assert_noindex_query_pass( 'paged_home' ); // static: allow overrides
 			} elseif ( Query::is_archive() || Query::is_singular_archive() ) {
-				yield from static::assert_noindex_query_pass( 'paged' );
+				yield from static::assert_noindex_query_pass( 'paged' ); // static: allow overrides
 			}
 			if ( Query::is_singular() ) {
-				yield from static::assert_noindex_query_pass( 'protected' );
+				yield from static::assert_noindex_query_pass( 'protected' ); // static: allow overrides
 
 				if ( Query::is_comment_paged() )
-					yield from static::assert_noindex_query_pass( 'cpage' );
+					yield from static::assert_noindex_query_pass( 'cpage' ); // static: allow overrides
 			}
 		}
 
@@ -157,9 +163,9 @@ final class Front extends Factory {
 
 		end:;
 	}
-	// phpcs:enable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
-	// phpcs:enable, PSR2.ControlStructures.SwitchDeclaration.TerminatingComment
-	// phpcs:enable, Generic.WhiteSpace.ScopeIndent.IncorrectExact
+	// phpcs:enable VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
+	// phpcs:enable PSR2.ControlStructures.SwitchDeclaration.TerminatingComment
+	// phpcs:enable Generic.WhiteSpace.ScopeIndent.IncorrectExact
 
 	/**
 	 * Generates robots assertions for noindex in passes.
@@ -170,6 +176,7 @@ final class Front extends Factory {
 	 * @param string $pass The passage to assert.
 	 */
 	private static function assert_noindex_query_pass( $pass ) {
+
 		switch ( $pass ) {
 			case 'paged_home':
 				yield 'paged_home' =>
@@ -212,6 +219,7 @@ final class Front extends Factory {
 						 * This filter won't run when a few other conditions for noindex have been met.
 						 *
 						 * @since 4.1.4
+						 * @since 5.2.0 Now also applies when robots meta are generated from arguments.
 						 * @link <https://github.com/sybrew/the-seo-framework/issues/194#issuecomment-864298702>
 						 * @param bool $noindex Whether to enable no posts protection.
 						 */
@@ -226,8 +234,7 @@ final class Front extends Factory {
 				break;
 
 			case 'protected':
-				// We get the "real ID" for WordPress might fault parsing a nefariously forged request.
-				yield 'protected' => Data\Post::is_protected( Query::get_the_real_id() );
+				yield 'protected' => Data\Post::is_protected();
 				break;
 
 			case 'cpage':

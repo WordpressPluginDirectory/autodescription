@@ -1,6 +1,6 @@
 <?php
 /**
- * @package The_SEO_Framework\Classes\Admin\Settings\Post
+ * @package The_SEO_Framework\Classes\Admin\Settings\Term
  * @subpackage The_SEO_Framework\Admin\Edit\Term
  */
 
@@ -8,7 +8,8 @@ namespace The_SEO_Framework\Admin\Settings;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\Helper\{
+use The_SEO_Framework\Data;
+use The_SEO_Framework\Helper\{
 	Query,
 	Taxonomy,
 	Template,
@@ -16,7 +17,7 @@ use \The_SEO_Framework\Helper\{
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -44,8 +45,8 @@ final class Term {
 	/**
 	 * Prepares the setting fields.
 	 *
-	 * @since 5.0.0
 	 * @hook current_screen 10
+	 * @since 5.0.0
 	 */
 	public static function prepare_setting_fields() {
 
@@ -57,7 +58,7 @@ final class Term {
 
 		\add_action(
 			"{$taxonomy}_edit_form",
-			[ static::class, 'output_setting_fields' ],
+			[ self::class, 'output_setting_fields' ],
 			/**
 			 * @since 2.6.0
 			 * @param int $priority The meta box term priority.
@@ -71,17 +72,26 @@ final class Term {
 	/**
 	 * Outputs the term settings fields.
 	 *
+	 * @hook {$taxonomy}_edit_form 0
 	 * @since 4.0.0
 	 *
 	 * @param \WP_Term $term     Current taxonomy term object.
 	 * @param string   $taxonomy Current taxonomy slug.
 	 */
 	public static function output_setting_fields( $term, $taxonomy ) {
+
+		\wp_nonce_field(
+			Data\Admin\Term::SAVE_NONCES['term-edit']['action'],
+			Data\Admin\Term::SAVE_NONCES['term-edit']['name'],
+		);
+
 		/**
 		 * @since 2.9.0
 		 */
 		\do_action( 'the_seo_framework_pre_tt_inpost_box' );
+
 		Template::output_view( 'term/settings', $term, $taxonomy );
+
 		/**
 		 * @since 2.9.0
 		 */

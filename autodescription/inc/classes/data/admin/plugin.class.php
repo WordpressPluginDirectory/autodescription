@@ -8,17 +8,19 @@ namespace The_SEO_Framework\Data\Admin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
-	Admin, // Yes, it ios legal to share class and namespace.
+use The_SEO_Framework\{
+	Admin, // Yes, it is legal to share class and namespace.
 	Data,
-	Helper\Query,
-	Helper\Format\Arrays,
 	Sitemap,
+};
+use The_SEO_Framework\Helper\{
+	Format\Arrays,
+	Query,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -34,12 +36,12 @@ use \The_SEO_Framework\{
  */
 
 /**
- * Holds a collection of data saving methods for posts.
+ * Holds a collection of data saving methods for the SEO settings.
  *
  * @since 5.0.0
  * @access private
  */
-class Plugin {
+final class Plugin {
 
 	/**
 	 * Register the database settings for saving and sanitizing via standard WordPress hooks.
@@ -74,19 +76,20 @@ class Plugin {
 		if (
 			   empty( $_POST[ \THE_SEO_FRAMEWORK_SITE_OPTIONS ] )
 			|| ! \is_array( $_POST[ \THE_SEO_FRAMEWORK_SITE_OPTIONS ] )
-		) return;
+		) {
+			return;
+		}
 
 		// This is also handled in /wp-admin/options.php. Nevertheless, one might register outside of scope.
-		if ( ! \current_user_can( \THE_SEO_FRAMEWORK_SETTINGS_CAP ) )
-			return;
+		if ( ! \current_user_can( \THE_SEO_FRAMEWORK_SETTINGS_CAP ) ) return;
 
 		// This is also handled in /wp-admin/options.php. Nevertheless, one might register outside of scope.
 		\check_admin_referer( \THE_SEO_FRAMEWORK_SITE_OPTIONS . '-options', '_wpnonce' );
 
 		if ( ! empty( $_POST[ \THE_SEO_FRAMEWORK_SITE_OPTIONS ]['tsf-settings-reset'] ) ) {
-			static::process_settings_reset();
+			self::process_settings_reset();
 		} else {
-			static::process_settings_submission();
+			self::process_settings_submission();
 		}
 	}
 
@@ -96,8 +99,6 @@ class Plugin {
 	 * @since 5.0.0
 	 * @since 5.1.0 1. Now differentiates the options independently of the order.
 	 *              2. Now resets options regardless of whether settings are changed from defaults.
-	 *
-	 * @return void Early if not on SEO settings page.
 	 */
 	private static function process_settings_reset() {
 
@@ -127,8 +128,6 @@ class Plugin {
 	 * @since 3.1.0 Now always flushes the cache, even before the options are updated.
 	 * @since 4.1.0 1. Renamed from 'handle_update_post' to 'process_settings_submission'
 	 *              2. Is now a protected method.
-	 *
-	 * @return void Early if nonce failed.
 	 */
 	private static function process_settings_submission() {
 
@@ -140,7 +139,7 @@ class Plugin {
 		/* // phpcs:ignore -- Nothing to set backward compat for, still in place because API is enforced.
 		\add_filter(
 			'pre_update_option_' . \THE_SEO_FRAMEWORK_SITE_OPTIONS,
-			[ static::class, 'set_backward_compatibility' ],
+			[ self::class, 'set_backward_compatibility' ],
 		);
 		*/
 
@@ -148,7 +147,7 @@ class Plugin {
 		\add_action(
 			'update_option_' . \THE_SEO_FRAMEWORK_SITE_OPTIONS,
 			[ Data\Plugin::class, 'flush_cache' ],
-			0
+			0,
 		);
 
 		// Sets that the options are unchanged, preemptively.
@@ -158,12 +157,12 @@ class Plugin {
 		// This is benign.
 		\add_action(
 			'update_option_' . \THE_SEO_FRAMEWORK_SITE_OPTIONS,
-			[ static::class, 'set_option_updated_notice' ],
+			[ self::class, 'set_option_updated_notice' ],
 		);
 
 		\add_action(
 			'update_option_' . \THE_SEO_FRAMEWORK_SITE_OPTIONS,
-			[ static::class, 'update_db_version' ],
+			[ self::class, 'update_db_version' ],
 			12,
 		);
 

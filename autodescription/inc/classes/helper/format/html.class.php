@@ -8,16 +8,16 @@ namespace The_SEO_Framework\Helper\Format;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\umemo;
+use function The_SEO_Framework\umemo;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Data\Filter\Sanitize,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -82,7 +82,7 @@ class HTML {
 	 * It essentially strips all tags, and replaces block-type tags' endings with spaces.
 	 * When done, it performs a sanity-cleanup via `strip_tags()`.
 	 *
-	 * Tip: You might want to use method `s_dupe_space()` to clear up the duplicated/repeated spaces afterward.
+	 * Tip: You might want to use method `remove_repeated_spacing()` to clear up the duplicated/repeated spaces afterward.
 	 *
 	 * @since 3.2.4
 	 * @since 4.0.0 Now allows emptying the indexes `space` and `clear`.
@@ -106,6 +106,10 @@ class HTML {
 	 *              8. Added preparation memoization using cache delimiters `$args['space']` and `$args['clear']`.
 	 * @since 4.2.8 Elements with that start with exactly the same text as others won't be preemptively closed.
 	 * @since 5.0.0 Moved from `\The_SEO_Framework\Load`.
+	 * @since 5.1.3 1. Added 'body' and 'style' to the phrase elements.
+	 *              2. Added conditional "NO_JIT" modifier for huge inputs to prevent abortion due to suspected memory issues.
+	 *              3. Improved regex pattern to ignore bitwise operators (<<) encountered in scripts. Also prevents recursive
+	 *                 lookup loops when encountering these operators in elements.
 	 *
 	 * @link https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Content_categories
 	 * @link https://html.spec.whatwg.org/multipage/syntax.html#void-elements
@@ -172,7 +176,7 @@ class HTML {
 		}
 
 		$parse = umemo( __METHOD__ . '/parse', null, $args['space'], $args['clear'] );
-		// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition -- I know.
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition -- I know.
 		if ( ! $parse ) {
 			// Void elements never have content. 'param', 'source', 'track',
 			$void = [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'wbr' ];
@@ -180,7 +184,7 @@ class HTML {
 			// Blocks: address, area, article, aside, audio, blockquote, br, button, canvas, dd, details, dialog, div, dl, dt, fieldset, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hgroup, hr, li, ol, pre, table, td, template, textarea, th, tr, ul, video.
 			// Some block elements can be interpreted as phrasing elements, like audio, canvas, button, and video; hence, they're also listed in $phrase.
 			// 'br' is a phrase element, but also a struct whitespace -- let's omit it so we can substitute it with a space as block.
-			$phrase = [ 'a', 'area', 'abbr', 'audio', 'b', 'bdo', 'bdi', 'button', 'canvas', 'cite', 'code', 'data', 'datalist', 'del', 'dfn', 'em', 'embed', 'i', 'iframe', 'img', 'input', 'ins', 'link', 'kbd', 'label', 'map', 'mark', 'meta', 'math', 'meter', 'noscript', 'object', 'output', 'picture', 'progress', 'q', 'ruby', 's', 'samp', 'script', 'select', 'small', 'span', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'u', 'var', 'video', 'wbr' ];
+			$phrase = [ 'a', 'area', 'abbr', 'audio', 'b', 'bdo', 'bdi', 'body', 'button', 'canvas', 'cite', 'code', 'data', 'datalist', 'del', 'dfn', 'em', 'embed', 'i', 'iframe', 'img', 'input', 'ins', 'link', 'kbd', 'label', 'map', 'mark', 'meta', 'math', 'meter', 'noscript', 'object', 'output', 'picture', 'progress', 'q', 'ruby', 's', 'samp', 'script', 'select', 'small', 'span', 'strong', 'style', 'sub', 'sup', 'svg', 'textarea', 'time', 'u', 'var', 'video', 'wbr' ];
 
 			$marked_for_parsing = array_merge( $args['space'], $args['clear'] );
 
@@ -211,10 +215,15 @@ class HTML {
 			);
 		}
 
+		// If the input is too large, we disable JIT compilation to prevent memory issues.
+		// This can add a millisecond or two, but I doubt anyone with such large inputs can even notice.
+		$nojit = \strlen( $input ) > 1e6 ? '(*NO_JIT)' : '';
+
 		foreach ( $parse as $query_type => $handles ) {
 			foreach ( $handles as $flow_type => $elements ) {
+				if ( ! $elements ) continue;
 				// Test $input again as it's overwritten in loop.
-				if ( ! str_contains( $input, '<' ) || ! $elements ) break 2;
+				if ( ! str_contains( $input, '<' ) ) break 2;
 
 				switch ( $query_type ) {
 					case 'void_query':
@@ -226,10 +235,10 @@ class HTML {
 							 */
 							\sprintf(
 								'/<(?!\/)(?:%s)\b(?:[^=>\/]*=(?:(?:([\'"])[^$]*?\g{-1})|[\s\/]*))*+[^>]*>/i',
-								implode( '|', $elements )
+								implode( '|', $elements ),
 							),
 							'phrase' === $flow_type ? '' : ' ', // Add space if block, otherwise clear.
-							$input
+							$input,
 						) ?? '';
 						break;
 
@@ -241,13 +250,14 @@ class HTML {
 						$passes      ??= 1;
 						$replacement ??= 'phrase' === $flow_type ? '' : ' ';
 
-						// Akin to https://regex101.com/r/LR8iem/6. (This might be outdated, copy work!)
+						// Akin to https://regex101.com/r/LR8iem/8. (This might be outdated, copy work!)
 						// Ref https://www.w3.org/TR/2011/WD-html5-20110525/syntax.html (specifically end-tags)
 						$regex = \sprintf(
-							'/<(?!\/)(%s)\b([^=>\/]*=(?:(?:([\'"])[^$]*?\g{-1})|[\s\/]*))*+(?:(?2)++|[^>]*>)((?:[^<]*+(?:<(?!\/?\1\b.*?>)[^<]+)*|(?R))*?)<\/\1\s*>/i', // good enough
-							implode( '|', $elements )
+							"/{$nojit}<(?!\/)(%s)(?!\s*<)\b([^=>\/]*=(?:(?:(['\"])[^$]*?\g{-1})|[\s\/]*))*+(?:(?2)++|[^>]*>)((?:[^<]*+(?:<*+(?!\/?\\1\b.*?>)[^<]+)*|(?R))*?)<\/\\1\s*>/i", // quite perfect
+							/* "/{$nojit}<(?!\/)(%s)(?!\s*<)\b([^=>\/]*=(?:(?:([\'\"])[^$]*?\g{-1})|[\s\/]*))*+(?:(?2)++|[^>]*>)((?:[^<]*+(?:<*+(?!\/?\\1\b.*?>)[^<]+)*|(?R))*?)(?><\/\\1\s*>|\Z)/i", // adds \Z modifier to prevent a loop when encountering an unclosed element -- Though, I'd much rather prefer it would "SKIP" when \Z is encountered -- replacing the \Z with (*SKIP) will cause other issues. This also increases processing time by ~15% for properly formatted content */
+							implode( '|', $elements ),
 						);
-						// Work in progress: /(<(?(R)\/?|(?!\/))(%s)\b)([^=>\/]*=(?:(?:([\'"])[^$]*?\g{-1})|[\s\/]*))*+(?:(?-2)*+|(?:.*?))>([^<]*+|(?R)|<\/\2\b\s*>)/i
+						// Work in progress (should be faster): /(<(?(R)\/?|(?!\/))(%s)\b)([^=>\/]*=(?:(?:([\'"])[^$]*?\g{-1})|[\s\/]*))*+(?:(?-2)*+|(?:.*?))>([^<]*+|(?R)|<\/\2\b\s*>)/i
 
 						$i = 0;
 						// To be most accurate, we should parse 'space' $type at least twice, up to 6 times. This is a performance hog.
@@ -257,7 +267,12 @@ class HTML {
 							$input          = preg_replace( $regex, $replacement, $input ) ?? '';
 
 							// If nothing changed, or no more HTML is present, we're done.
-							if ( $pre_pass_input === $input || ! str_contains( $input, '<' ) ) break;
+							if (
+								   $pre_pass_input === $input
+								|| ! str_contains( $input, '<' )
+							) {
+								break;
+							}
 						}
 
 						// Reset for next fall-through null-coalescing.
@@ -266,7 +281,7 @@ class HTML {
 			}
 		}
 
-		// phpcs:ignore, WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- $args defines stripping of 'script' and 'style'.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- $args defines stripping of 'script' and 'style'.
 		return $args['strip'] ? \strip_tags( $input ) : $input;
 	}
 
@@ -281,7 +296,8 @@ class HTML {
 	 * @since 4.2.7 1. No longer clears `figcaption`, `hr`, `link`, `meta`, `option`, or `tfoot`.
 	 *              2. Now clears `area`, `audio`, `datalist`, `del`, `dialog`, `dl`, `hgroup`, `menu`, `meter`, `ol`,
 	 *                 `object`, `output`, `progress`, `s`, `template`, and `ul`.
-	 *              3. Now adds spaces around `blockquote`, `details`, and `hr`.
+	 *              3. Now adds spaces around `details` and `hr`.
+	 *                 `blockquote` is cleared, so its content is removed.
 	 *              4. Now ignores `dd`, `dl`, `dt`, `li`, `main`, for they are inherently excluded or ignored anyway.
 	 *              5. Now processed the `auto_description_html_method` option for stripping tags.
 	 * @since 5.0.0 1. The first parameter is now required.
@@ -304,7 +320,8 @@ class HTML {
 	 */
 	public static function extract_content( $html, $args = [] ) {
 
-		if ( empty( $html ) ) return '';
+		if ( empty( $html ) )
+			return '';
 
 		$args += [
 			'allow_shortcodes' => true,
@@ -339,22 +356,25 @@ class HTML {
 				'clear'  =>
 					[ 'address', 'area', 'aside', 'audio', 'blockquote', 'button', 'canvas', 'code', 'datalist', 'del', 'dialog', 'dl', 'fieldset', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'iframe', 'input', 'label', 'map', 'menu', 'meter', 'nav', 'noscript', 'ol', 'object', 'output', 'pre', 'progress', 's', 'script', 'select', 'style', 'svg', 'table', 'template', 'textarea', 'ul', 'video' ],
 				'passes' => $passes,
-			]
+			],
 		);
 
-		/**
-		 * Always strip shortcodes unless specifically allowed via the filter.
-		 * Always strip shortcodes if not allowed by the arguments, ignoring the filter.
-		 *
-		 * @since 2.6.6.1
-		 * @since 5.0.0 Added the third `$args` parameter.
-		 * @param bool $allow_shortcodes Whether to allow shortcodes.
-		 * @param array $args The extraction parameters.
-		 */
-		if ( ! $args['allow_shortcodes'] || ! \apply_filters( 'the_seo_framework_allow_excerpt_shortcode_tags', false, $args ) )
+		// Always strip shortcodes if not allowed by the arguments, ignoring the filter.
+		if ( ! $args['allow_shortcodes'] || ! (
+			/**
+			 * Always strip shortcodes unless specifically allowed via the filter.
+			 *
+			 * @since 2.6.6.1
+			 * @since 5.0.0 Added the third `$args` parameter.
+			 * @param bool $allow_shortcodes Whether to allow shortcodes.
+			 * @param array $args The extraction parameters.
+			 */
+			\apply_filters( 'the_seo_framework_allow_excerpt_shortcode_tags', false, $args )
+		) ) {
 			$html = \strip_shortcodes( $html );
+		}
 
-		$html = static::strip_tags_cs( $html, $strip_args );
+		$html = self::strip_tags_cs( $html, $strip_args );
 
 		if ( \is_int( $args['clamp'] ) )
 			$html = Strings::clamp_sentence( $html, 1, $args['clamp'] );

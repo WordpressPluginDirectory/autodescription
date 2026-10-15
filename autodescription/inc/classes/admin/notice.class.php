@@ -8,11 +8,11 @@ namespace The_SEO_Framework\Admin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\Admin; // Yes, it is legal to share class and namespace.
+use The_SEO_Framework\Admin; // Yes, it is legal to share class and namespace.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -28,7 +28,7 @@ use \The_SEO_Framework\Admin; // Yes, it is legal to share class and namespace.
  */
 
 /**
- * Holds simple persistent notices functionality.
+ * Holds dismissible notice generation.
  *
  * @since 5.0.0
  * @access protected
@@ -55,12 +55,12 @@ class Notice {
 	 *                          Default 'updated'.
 	 *     @type bool   $icon   Optional. Whether to enable icon. Default true.
 	 *     @type bool   $escape Optional. Whether to escape the $message. Default true.
-	 *     @type bool   $inline Optional. Whether to escape the whole output. Default false.
+	 *     @type bool   $inline Optional. Whether to add the `inline` class. Default false.
 	 * }
 	 */
 	public static function output_notice( $message, $args ) {
-		// phpcs:ignore, WordPress.Security.EscapeOutput -- use $escape
-		echo static::generate_notice( $message, $args );
+		// phpcs:ignore WordPress.Security.EscapeOutput -- use $escape
+		echo self::generate_notice( $message, $args );
 	}
 
 	/**
@@ -91,7 +91,7 @@ class Notice {
 	 *                          Default 'updated'.
 	 *     @type bool   $icon   Optional. Whether to enable icon. Default true.
 	 *     @type bool   $escape Optional. Whether to escape the $message. Default true.
-	 *     @type bool   $inline Optional. Whether to escape the whole output. Default false.
+	 *     @type bool   $inline Optional. Whether to add the `inline` class. Default false.
 	 * }
 	 * @return string The dismissible error notice.
 	 */
@@ -130,7 +130,7 @@ class Notice {
 				),
 				\sprintf(
 					'<a class="hide-if-no-tsf-js tsf-dismiss" href="javascript:;" title="%s"></a>',
-					\esc_attr__( 'Dismiss this notice', 'default' )
+					\esc_attr__( 'Dismiss this notice', 'default' ),
 				),
 			],
 		);

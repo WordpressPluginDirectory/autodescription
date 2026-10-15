@@ -8,11 +8,11 @@ namespace The_SEO_Framework\Sitemap;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\Data;
+use The_SEO_Framework\Data;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -56,7 +56,7 @@ class Cache {
 	public static function clear_sitemap_caches() {
 
 		foreach ( Registry::get_sitemap_endpoint_list() as $id => $data ) {
-			$transient = static::get_sitemap_cache_key( $id );
+			$transient = self::get_sitemap_cache_key( $id );
 
 			if ( $transient )
 				\delete_transient( $transient );
@@ -90,6 +90,36 @@ class Cache {
 	}
 
 	/**
+	 * Deletes sitemap transients for each locale.
+	 *
+	 * `clear_sitemap_caches()` only deletes the current locale.
+	 * A persistent object cache keeps the other locales out of the options table.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string[] $locales Locale codes, such as `nl_NL`.
+	 */
+	public static function delete_sitemap_transients_for_locales( $locales ) {
+
+		$prefix    = self::get_transient_prefix();
+		$cache_ids = array_unique( array_filter( array_column(
+			Registry::get_sitemap_endpoint_list(),
+			'cache_id',
+		) ) );
+		$blog_id   = $GLOBALS['blog_id'];
+
+		$locales = array_unique( (array) $locales );
+
+		foreach ( $cache_ids as $cache_id ) {
+			foreach ( $locales as $locale ) {
+				if ( ! \is_string( $locale ) || ! $locale ) continue;
+
+				\delete_transient( "{$prefix}{$cache_id}_{$blog_id}_{$locale}" );
+			}
+		}
+	}
+
+	/**
 	 * Tells whether sitemap caching is enabled by user.
 	 *
 	 * @since 5.0.0
@@ -117,19 +147,24 @@ class Cache {
 	 * Returns the sitemap's storage transient name.
 	 *
 	 * @since 5.0.0
+	 * @since 5.2.0 Now returns false when `cache_id` is missing or empty.
 	 *
 	 * @param string $sitemap_id The sitemap ID.
 	 * @return string|false The sitemap transient store key.
+	 *                      False when the endpoint is missing or `cache_id` is not set.
 	 */
 	public static function get_sitemap_cache_key( $sitemap_id ) {
 
 		$ep_list = Registry::get_sitemap_endpoint_list();
 
-		if ( empty( $ep_list[ $sitemap_id ] ) ) return false;
+		if ( empty( $ep_list[ $sitemap_id ] ) )
+			return false;
 
-		$cache_key = $ep_list[ $sitemap_id ]['cache_id'] ?? $sitemap_id;
+		$cache_id = $ep_list[ $sitemap_id ]['cache_id'] ?? null;
 
-		return static::build_sitemap_cache_key( static::get_transient_prefix() . $cache_key );
+		if ( ! $cache_id ) return false;
+
+		return self::build_sitemap_cache_key( self::get_transient_prefix() . $cache_id );
 	}
 
 	/**
@@ -144,9 +179,10 @@ class Cache {
 	 */
 	public static function cache_sitemap_content( $content, $sitemap_id = '', $expiration = \WEEK_IN_SECONDS ) {
 
-		$transient_key = static::get_sitemap_cache_key( $sitemap_id );
+		$transient_key = self::get_sitemap_cache_key( $sitemap_id );
 
-		if ( ! $transient_key ) return false;
+		if ( ! $transient_key )
+			return false;
 
 		return \set_transient( $transient_key, $content, $expiration );
 	}
@@ -161,9 +197,10 @@ class Cache {
 	 */
 	public static function get_cached_sitemap_content( $sitemap_id = '' ) {
 
-		$transient_key = static::get_sitemap_cache_key( $sitemap_id );
+		$transient_key = self::get_sitemap_cache_key( $sitemap_id );
 
-		if ( ! $transient_key ) return false;
+		if ( ! $transient_key )
+			return false;
 
 		return \get_transient( $transient_key );
 	}

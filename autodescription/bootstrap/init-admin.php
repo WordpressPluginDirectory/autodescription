@@ -8,16 +8,13 @@ namespace The_SEO_Framework;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\is_headless;
+use function The_SEO_Framework\is_headless;
 
-use \The_SEO_Framework\Helper\{
-	Compatibility,
-	Query,
-};
+use The_SEO_Framework\Helper\Compatibility;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -31,22 +28,6 @@ use \The_SEO_Framework\Helper\{
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
-$refresh_sitemap_callback = [ Sitemap\Registry::class, '_refresh_sitemap_on_post_change' ];
-// Can-be cron actions.
-\add_action( 'publish_post', $refresh_sitemap_callback );
-\add_action( 'publish_page', $refresh_sitemap_callback );
-
-// Other actions.
-\add_action( 'deleted_post', $refresh_sitemap_callback );
-\add_action( 'deleted_page', $refresh_sitemap_callback );
-\add_action( 'post_updated', $refresh_sitemap_callback );
-\add_action( 'page_updated', $refresh_sitemap_callback );
-
-$clear_excluded_callback = [ Query\Exclusion::class, 'clear_excluded_post_ids_cache' ];
-// Excluded IDs cache.
-\add_action( 'wp_insert_post', $clear_excluded_callback );
-\add_action( 'attachment_updated', $clear_excluded_callback );
 
 // Delete Sitemap transient on permalink structure change.
 \add_action(
@@ -77,13 +58,16 @@ if ( ! $headless['meta'] ) {
 	\add_action( 'add_meta_boxes', [ Admin\Settings\Post::class, 'prepare_meta_box' ] );
 
 	// Enqueue Term meta output. Terms don't have proper catch-all hooks, so this loads on every page:
-	\add_action( 'current_screen', [ Admin\Settings\Term::class, 'prepare_setting_fields' ] );
+	if ( Data\Plugin::get_option( 'display_term_edit_options' ) )
+		\add_action( 'current_screen', [ Admin\Settings\Term::class, 'prepare_setting_fields' ] );
 
 	// Adds post states to list view tables.
 	\add_filter( 'display_post_states', [ Admin\Lists\PostStates::class, 'add_post_state' ], 10, 2 );
 
-	// Initialize quick and bulk edit for posts and terms.
-	\add_action( 'admin_init', [ Admin\Settings\ListEdit::class, 'init_quick_and_bulk_edit' ] );
+	if ( Data\Plugin::get_option( 'display_list_edit_options' ) ) {
+		// Initialize quick and bulk edit for posts and terms.
+		\add_action( 'admin_init', [ Admin\Settings\ListEdit::class, 'init_quick_and_bulk_edit' ] );
+	}
 
 	if ( Data\Plugin::get_option( 'display_seo_bar_tables' ) ) {
 		// Initialize the SEO Bar for tables.
@@ -118,14 +102,17 @@ if ( ! $headless['settings'] ) {
 	\add_action( 'admin_menu', [ Admin\Menu::class, 'register_top_menu_page' ] );
 }
 
-if ( ! $headless['user'] ) {
-	// Initialize user meta filters and actions.
+if (
+	   ! $headless['user']
+	&& Data\Plugin::get_option( 'display_user_edit_options' )
+) {
 	\add_action( 'show_user_profile', [ Admin\Settings\User::class, 'prepare_setting_fields' ], 0, 1 );
 	\add_action( 'edit_user_profile', [ Admin\Settings\User::class, 'prepare_setting_fields' ], 0, 1 );
-
-	\add_action( 'personal_options_update', [ Data\Admin\User::class, 'update_meta' ], 10, 1 );
-	\add_action( 'edit_user_profile_update', [ Data\Admin\User::class, 'update_meta' ], 10, 1 );
 }
+
+// Profile fields stay hidden while headless. The save handler still runs and tests headless after the nonce.
+\add_action( 'personal_options_update', [ Data\Admin\User::class, 'update_meta' ] );
+\add_action( 'edit_user_profile_update', [ Data\Admin\User::class, 'update_meta' ] );
 
 if ( \in_array( false, $headless, true ) ) { // Still got head...
 	// Set up notices.
@@ -135,19 +122,23 @@ if ( \in_array( false, $headless, true ) ) { // Still got head...
 	\add_action( 'admin_init', [ Admin\Notice\Persistent::class, '_dismiss_notice' ] );
 
 	// Enqueues admin scripts.
-	\add_action( 'admin_enqueue_scripts', [ Admin\Script\Registry::class, '_init' ], 0, 1 );
+	\add_action( 'admin_enqueue_scripts', [ Admin\Script\Registry::class, '_init' ], 0 );
 
 	// Setup user sanitization. If at least something isn't headless, user metadata can be used.
 	\add_action(
 		'sanitize_user_meta_' . \THE_SEO_FRAMEWORK_USER_OPTIONS,
 		[ Data\Filter\User::class, 'filter_meta_update' ],
 	);
+	\add_action(
+		'sanitize_user_meta_' . \THE_SEO_FRAMEWORK_USER_PREFERENCES,
+		[ Data\Filter\User::class, 'filter_preference_update' ],
+	);
 }
 
 // Add plugin links to the plugin activation page.
 \add_filter(
 	'plugin_action_links_' . \THE_SEO_FRAMEWORK_PLUGIN_BASENAME,
-	[ Admin\PluginTable::class, 'add_plugin_action_links' ]
+	[ Admin\PluginTable::class, 'add_plugin_action_links' ],
 );
 \add_filter(
 	'plugin_row_meta',

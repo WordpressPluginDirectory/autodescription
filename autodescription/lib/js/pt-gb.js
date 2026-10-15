@@ -7,7 +7,7 @@
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -41,7 +41,7 @@ window.tsfPTGB = function () {
 	 *
 	 * @since 4.0.0
 	 * @access public
-	 * @type {(Object<string,*>)|boolean|null} l10n Localized strings
+	 * @type {(Object<string,*>)|Boolean|null} l10n Localized strings
 	 */
 	const l10n = tsfPTL10n;
 
@@ -95,13 +95,17 @@ window.tsfPTGB = function () {
 	 * @param {String} taxonomySlug
 	 */
 	function dispatchUpdateEvent( id, taxonomySlug ) {
+
 		document.dispatchEvent(
 			new CustomEvent(
 				'tsf-updated-primary-term',
 				{
-					detail: { id, taxonomy: taxonomySlug },
-				}
-			)
+					detail: {
+						id,
+						taxonomy: taxonomySlug,
+					},
+				},
+			),
 		);
 	}
 
@@ -115,22 +119,25 @@ window.tsfPTGB = function () {
 	 *     set:                   ( id: string|integer, fallback: string|integer ) => integer,
 	 *     revalidate:            ( selectedTerms: integer[] ) => integer,
 	 *     registerPostField:     () => void,
-	 *     isPostFieldRegistered: () => boolean,
+	 *     isPostFieldRegistered: () => Boolean,
 	 * }}
 	 */
-	function _primaryTerm( taxonomySlug ) {
+	function _primaryTermSelector( taxonomySlug ) {
 
 		const _primaryTermField = () => document.getElementById( `autodescription[_primary_term_${taxonomySlug}]` );
 
 		const get = () => +( _primaryTermField().value );
 		const set = ( id, fallback ) => {
+
 			id = +id;
 			_primaryTermField().value = id;
 			dispatchUpdateEvent( id || +fallback, taxonomySlug );
+
 			return id;
 		};
 
 		const revalidate = selectedTerms => {
+
 			const primaryTerm = get();
 
 			if ( selectedTerms.includes( primaryTerm ) )
@@ -140,17 +147,20 @@ window.tsfPTGB = function () {
 		}
 
 		const registerPostField = () => {
+
 			const wrap = document.getElementById( 'tsf-gutenberg-data-holder' );
 
-			if ( ! wrap ) {
-				_registeredFields.set( taxonomySlug, false );
-			} else {
+			if ( wrap ) {
 				wrap.insertAdjacentHTML(
 					'beforeend',
-					wp.template( 'tsf-primary-term-selector' )( { taxonomy: supportedTaxonomies[ taxonomySlug ] } )
+					wp.template( 'tsf-primary-term-selector' )( {
+						taxonomy: supportedTaxonomies[ taxonomySlug ],
+					} ),
 				);
 
 				_registeredFields.set( taxonomySlug, true );
+			} else {
+				_registeredFields.set( taxonomySlug, false );
 			}
 		}
 		const isPostFieldRegistered = () => !! _registeredFields.get( taxonomySlug );
@@ -171,7 +181,7 @@ window.tsfPTGB = function () {
 		function primaryTermSelector( props ) {
 
 			const { taxonomySlug }            = props;
-			const primaryTerm                 = _primaryTerm( taxonomySlug );
+			const primaryTerm                 = _primaryTermSelector( taxonomySlug );
 			const [ selection, setSelection ] = useState( primaryTerm.get() );
 
 			// Ref: <https://github.com/WordPress/gutenberg/pull/33418#issuecomment-903686737>
@@ -181,6 +191,7 @@ window.tsfPTGB = function () {
 				availableTerms,
 			} = useSelect(
 				select => {
+
 					const { getTaxonomy, getEntityRecords, isResolving } = select( 'core' );
 					const { getEditedPostAttribute }                     = select( 'core/editor' );
 
@@ -202,6 +213,7 @@ window.tsfPTGB = function () {
 				// = Mega edge case Gutenberg doesn't handle (properly) either.
 			useEffect(
 				() => {
+
 					if ( ! selectedTerms.includes( +selection ) || primaryTerm.get() !== +selection ) {
 						primaryTerm.revalidate( selectedTerms );
 						setSelection( primaryTerm.get() );
@@ -218,11 +230,13 @@ window.tsfPTGB = function () {
 					|| availableTerms?.[0]?.id
 					|| 0
 				);
+
 				// Hide selector. Halt function.
 				return null;
 			}
 
 			const onChange = termId => {
+
 				if ( ! selectedTerms.includes( +termId ) ) return;
 				primaryTerm.set( termId );
 				setSelection( primaryTerm.get() );
@@ -259,7 +273,7 @@ window.tsfPTGB = function () {
 		const PrimaryTermSelectorFilter = OriginalComponent => class extends Component {
 			render() {
 				// If we cannot store the primary term for this taxonomy, bail.
-				if ( ! _primaryTerm( this.props?.slug ).isPostFieldRegistered() )
+				if ( ! _primaryTermSelector( this.props?.slug ).isPostFieldRegistered() )
 					return createElement( OriginalComponent, { ...this.props } );
 
 				return createElement(
@@ -280,7 +294,7 @@ window.tsfPTGB = function () {
 		}
 
 		for ( let taxonomySlug in supportedTaxonomies )
-			_primaryTerm( taxonomySlug ).registerPostField();
+			_primaryTermSelector( taxonomySlug ).registerPostField();
 
 		wp.hooks.addFilter(
 			'editor.PostTaxonomyType',
@@ -289,21 +303,24 @@ window.tsfPTGB = function () {
 		);
 	}
 
-	return Object.assign( {
-		/**
-		 * Initialises all aspects of the scripts.
-		 * You shouldn't call this.
-		 *
-		 * @since 3.2.0
-		 * @access protected
-		 *
-		 * @function
-		 */
-		load: () => {
-			document.body.addEventListener( 'tsf-ready', _initPrimaryTerm );
+	return Object.assign(
+		{
+			/**
+			 * Initialises all aspects of the scripts.
+			 * You shouldn't call this.
+			 *
+			 * @since 3.2.0
+			 * @access protected
+			 *
+			 * @function
+			 */
+			load: () => {
+				document.body.addEventListener( 'tsf-ready', _initPrimaryTerm );
+			},
 		},
-	}, {
-		l10n,
-	} );
+		{
+			l10n,
+		},
+	);
 }();
 window.tsfPTGB.load();

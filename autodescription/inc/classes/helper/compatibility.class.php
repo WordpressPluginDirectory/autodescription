@@ -8,16 +8,16 @@ namespace The_SEO_Framework\Helper;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\memo;
+use function The_SEO_Framework\memo;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Admin,
 	Data,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -38,10 +38,10 @@ use \The_SEO_Framework\{
  * @since 5.0.0
  * @access private
  */
-class Compatibility {
+final class Compatibility {
 
 	/**
-	 * Registers plugin cache checks on plugin activation.
+	 * Registers the SEO plugin conflict notice when any plugin is activated and a conflicting SEO plugin is active.
 	 *
 	 * @hook activated_plugin 10
 	 * @since 5.0.0
@@ -49,7 +49,8 @@ class Compatibility {
 	public static function try_plugin_conflict_notification() {
 
 		// We refresh here because the list is loaded before a plugin is (de)activated.
-		if ( ! static::get_active_conflicting_plugin_types( true )['seo_tools'] ) return;
+		if ( ! self::get_active_conflicting_plugin_types( true )['seo_tools'] )
+			return;
 
 		Admin\Notice\Persistent::register_notice(
 			\__( 'Multiple SEO plugins have been detected. You should only use one.', 'autodescription' ),
@@ -69,12 +70,39 @@ class Compatibility {
 	}
 
 	/**
-	 * Clears plugin cache checks on plugin deactivation.
+	 * Clears the SEO plugin conflict notice when no conflicting SEO plugin remains.
+	 *
+	 * Runs on `deactivated_plugin`, before the active plugin list is stored, once per plugin.
+	 * Plugins deactivated in this request count as already gone, so one action clears the
+	 * notice once. Silent updates do not fire this hook, so the notice stays.
 	 *
 	 * @hook deactivated_plugin 10
 	 * @since 5.0.0
+	 * @since 5.2.0 Now clears the notice only when no conflicting SEO plugin remains.
+	 *              Plugins deactivated in this request count as inactive, because this
+	 *              hook still runs before the active plugin list is stored.
+	 *
+	 * @param string $plugin The plugin basename just deactivated.
 	 */
-	public static function clear_plugin_conflict_notification() {
+	public static function clear_plugin_conflict_notification( $plugin = '' ) {
+
+		static $deactivated = [];
+
+		if ( $plugin )
+			$deactivated[] = $plugin;
+
+		$active = array_diff(
+			Data\Blog::get_active_plugins(),
+			$deactivated,
+		);
+
+		if ( array_intersect(
+			self::get_conflicting_plugins()['seo_tools'],
+			$active,
+		) ) {
+			return;
+		}
+
 		Admin\Notice\Persistent::clear_notice( 'seo-plugin-conflict' );
 	}
 
@@ -144,33 +172,7 @@ class Compatibility {
 		 *     @type string[] $multilingual The conflicting multilingual plugins base files, indexed by plugin name.
 		 * }
 		 */
-		$conflicting_plugins = (array) \apply_filters(
-			'the_seo_framework_conflicting_plugins',
-			$conflicting_plugins,
-		);
-
-		if ( \has_filter( 'the_seo_framework_conflicting_plugins_type' ) ) {
-			foreach ( $conflicting_plugins as $type => &$plugins ) {
-				/**
-				 * @since 2.6.1
-				 * @since 5.0.0 Deprecated. Use `the_seo_framework_conflicting_plugins` instead.
-				 * @deprecated
-				 * @param array  $conflicting_plugins Conflicting plugins
-				 * @param string $type                The type of plugins to get.
-				*/
-				$plugins = (array) \apply_filters_deprecated(
-					'the_seo_framework_conflicting_plugins_type',
-					[
-						$plugins,
-						$type,
-					],
-					'5.0.0 of The SEO Framework',
-					'the_seo_framework_conflicting_plugins',
-				);
-			}
-		}
-
-		return $conflicting_plugins;
+		return (array) \apply_filters( 'the_seo_framework_conflicting_plugins', $conflicting_plugins );
 	}
 
 	/**
@@ -191,8 +193,9 @@ class Compatibility {
 	 */
 	public static function get_active_conflicting_plugin_types( $refresh = false ) {
 
-		// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition -- I know.
-		if ( ! $refresh && null !== $memo = memo() ) return $memo;
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition -- I know.
+		if ( ! $refresh && null !== $memo = memo() )
+			return $memo;
 
 		$conflicting_types = [
 			'seo_tools'    => false,
@@ -205,7 +208,7 @@ class Compatibility {
 
 		$active_plugins = Data\Blog::get_active_plugins();
 
-		foreach ( static::get_conflicting_plugins() as $type => $plugins )
+		foreach ( self::get_conflicting_plugins() as $type => $plugins )
 			if ( array_intersect( $plugins, $active_plugins ) )
 				$conflicting_types[ $type ] = true;
 
@@ -259,7 +262,7 @@ class Compatibility {
 
 		// Check for classes
 		foreach ( $plugins['classes'] ?? [] as $name )
-			if ( ! class_exists( $name, false ) ) // phpcs:ignore, TSF.Performance.Functions.PHP -- we don't autoload.
+			if ( ! class_exists( $name, false ) ) // phpcs:ignore TSF.Performance.Functions.PHP -- we don't autoload.
 				return false;
 
 		// Check for classes
@@ -279,19 +282,17 @@ class Compatibility {
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `is_theme`.
 	 * @since 5.1.0 Added memoization.
+	 * @since 5.1.3 Removed memoization; now uses `Data\Blog::get_active_themes()`.
 	 *
 	 * @param string|string[] $themes The theme names to test.
 	 * @return bool Any of the themes are active.
 	 */
 	public static function is_theme_active( $themes = '' ) {
 
-		$active_theme = memo() ?? memo( array_unique( [
-			strtolower( \get_option( 'stylesheet' ) ), // Parent.
-			strtolower( \get_option( 'template' ) ),   // Child.
-		] ) );
+		$active_themes = Data\Blog::get_active_themes();
 
 		foreach ( (array) $themes as $theme )
-			if ( \in_array( strtolower( $theme ), $active_theme, true ) )
+			if ( \in_array( strtolower( $theme ), $active_themes, true ) )
 				return true;
 
 		return false;
@@ -322,10 +323,12 @@ class Compatibility {
 			 */
 			(bool) \apply_filters(
 				'the_seo_framework_shortcode_based_page_builder_active',
-				\defined( 'ET_BUILDER_VERSION' )
-				|| \defined( 'WPB_VC_VERSION' )
-				|| \defined( 'BRICKS_VERSION' ),
-			)
+				(
+					   \defined( 'ET_BUILDER_VERSION' )
+					|| \defined( 'WPB_VC_VERSION' )
+					|| \defined( 'BRICKS_VERSION' )
+				),
+			),
 		);
 	}
 }

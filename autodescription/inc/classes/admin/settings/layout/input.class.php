@@ -8,14 +8,14 @@ namespace The_SEO_Framework\Admin\Settings\Layout;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Data\Filter\Escape,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2021 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2021 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -70,7 +70,7 @@ class Input {
 	 * @param string|string[] $id The field id, or a map of indexes therefor.
 	 */
 	public static function field_id( $id ) {
-		echo \esc_attr( static::get_field_id( $id ) );
+		echo \esc_attr( self::get_field_id( $id ) );
 	}
 
 	/**
@@ -85,7 +85,7 @@ class Input {
 	 * @return string Full field name
 	 */
 	public static function get_field_name( $name ) {
-		return static::get_field_id( $name );
+		return self::get_field_id( $name );
 	}
 
 	/**
@@ -99,8 +99,8 @@ class Input {
 	 * @param string|string[] $name The field name, or a map of indexes therefor.
 	 */
 	public static function field_name( $name ) {
-		// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- field_id escapes.
-		echo static::field_id( $name );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- field_id escapes.
+		echo self::field_id( $name );
 	}
 
 	/**
@@ -118,7 +118,7 @@ class Input {
 	 *     @type string|string[] $id          The option index or map of indexes therefor, used as field ID.
 	 *     @type string          $class       The checkbox class.
 	 *     @type string          $label       The checkbox label description, placed inline of the checkbox.
-	 *     @type null|mixed      $value       The option value. If not set, it'll try to retrieve the value based on $id.
+	 *     @type ?mixed          $value       The option value. If not set, it'll try to retrieve the value based on $id.
 	 *     @type string          $description The checkbox additional description, placed underneat.
 	 *     @type array           $data        The checkbox field data. Sub-items are expected to be escaped if they're not an array.
 	 *     @type bool            $escape      Whether to enable escaping of the $label and $description.
@@ -144,7 +144,7 @@ class Input {
 			$args['label']       = \esc_html( $args['label'] );
 		}
 
-		$field_id = $field_name = static::get_field_id( $args['id'] );
+		$field_id = $field_name = self::get_field_id( $args['id'] );
 		$value    = $args['value'] ?? Data\Plugin::get_option( ...(array) $args['id'] );
 
 		$cb_classes = [];
@@ -155,7 +155,7 @@ class Input {
 		if ( $args['disabled'] ) {
 			$cb_classes[] = 'tsf-disabled';
 		} else {
-			array_push( $cb_classes, ...static::get_conditional_checked_classes( ...(array) $args['id'] ) );
+			array_push( $cb_classes, ...self::get_conditional_checked_classes( ...(array) $args['id'] ) );
 		}
 
 		return \sprintf(
@@ -164,7 +164,7 @@ class Input {
 				'<label for="%s"%s>%s</label>',
 				[
 					Escape::option_name_attribute( $field_id ),
-					( $args['disabled'] ? ' class=tsf-disabled' : '' ),
+					$args['disabled'] ? ' class=tsf-disabled' : '',
 					vsprintf(
 						'<input type=checkbox class="%s" name="%s" id="%s" value=1 %s%s %s /> %s',
 						[
@@ -172,7 +172,7 @@ class Input {
 							Escape::option_name_attribute( $field_name ),
 							Escape::option_name_attribute( $field_id ),
 							\checked( $value, true, false ),
-							( $args['disabled'] ? ' disabled' : '' ),
+							$args['disabled'] ? ' disabled' : '',
 							HTML::make_data_attributes( $args['data'] ),
 							$args['label'],
 						],
@@ -225,7 +225,7 @@ class Input {
 			),
 			[
 				\esc_attr( $id ),
-				// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+				// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 				HTML::make_data_attributes( $data ),
 			],
 		);
@@ -245,7 +245,7 @@ class Input {
 			'<span id="tsf-social-data_%1$s" class="hidden wp-exclude-emoji" data-group="%1$s" %2$s></span>',
 			[
 				\esc_attr( $group ),
-				// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+				// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 				HTML::make_data_attributes( [ 'settings' => $settings ] ),
 			],
 		);
@@ -272,7 +272,7 @@ class Input {
 			),
 			[
 				\esc_attr( $id ),
-				// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+				// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 				HTML::make_data_attributes( $data ),
 			],
 		);
@@ -291,7 +291,7 @@ class Input {
 			'<span id="tsf-canonical-data_%1$s" class="hidden wp-exclude-emoji" data-for="%1$s" %2$s ></span>',
 			[
 				\esc_attr( $id ),
-				// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+				// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 				HTML::make_data_attributes( $data ),
 			],
 		);

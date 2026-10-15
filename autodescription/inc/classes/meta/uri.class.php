@@ -8,21 +8,20 @@ namespace The_SEO_Framework\Meta;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
 	umemo,
 	get_query_type_from_args,
 	normalize_generation_args,
 };
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Helper\Query,
-	Meta,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -38,7 +37,7 @@ use \The_SEO_Framework\{
  */
 
 /**
- * Holds getters for meta tag output.
+ * Holds getters for URI output.
  *
  * Unlike other Meta functionality, we do not use "generated" vs. "custom" for every single function.
  * This is because URIs are ambiguously used throughout WordPress.
@@ -58,7 +57,7 @@ use \The_SEO_Framework\{
 class URI {
 
 	/**
-	 * Gets the canonical URL for indexation.
+	 * Gets the canonical URL for indexing.
 	 *
 	 * @since 5.0.0
 	 *
@@ -66,36 +65,15 @@ class URI {
 	 */
 	public static function get_indexable_canonical_url() {
 
-		$custom_url = static::get_custom_canonical_url();
+		$custom_url = self::get_custom_canonical_url();
 
 		if ( $custom_url )
 			return $custom_url;
 
-		if ( \has_filter( 'the_seo_framework_rel_canonical_output' ) ) {
-			/**
-			 * @since 2.6.5
-			 * @since 5.0.0 Deprecated.
-			 * @deprecated
-			 * @param string $url The canonical URL. Must be escaped.
-			 * @param int    $id  The current page or term ID.
-			 */
-			$url = (string) \apply_filters_deprecated(
-				'the_seo_framework_rel_canonical_output',
-				[
-					'',
-					\The_SEO_Framework\Helper\Query::get_the_real_id(),
-				],
-				'5.0.0 of The SEO Framework',
-				'the_seo_framework_meta_render_data',
-			);
-
-			if ( $url ) return $url;
-		}
-
 		if ( str_contains( Robots::get_meta(), 'noindex' ) )
 			return '';
 
-		return static::get_generated_url();
+		return self::get_generated_url();
 	}
 
 	/**
@@ -109,13 +87,13 @@ class URI {
 	 *              2. Moved from `\The_SEO_Framework\Load`.
 	 *              3. Now always returns a sanitized URL.
 	 *
-	 * @param array|null $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                         Leave null to autodetermine query.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine query.
 	 * @return string The canonical URL, if any.
 	 */
 	public static function get_canonical_url( $args = null ) {
-		return static::get_custom_canonical_url( $args )
-			?: static::get_generated_url( $args );
+		return self::get_custom_canonical_url( $args )
+			?: self::get_generated_url( $args );
 	}
 
 	/**
@@ -123,14 +101,14 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param array|null $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                         Leave null to autodetermine query.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine query.
 	 * @return string The custom canonical URL, if any.
 	 */
 	public static function get_custom_canonical_url( $args = null ) {
 		return isset( $args )
-			? static::get_custom_canonical_url_from_args( $args )
-			: static::get_custom_canonical_url_from_query();
+			? self::get_custom_canonical_url_from_args( $args )
+			: self::get_custom_canonical_url_from_query();
 	}
 
 	/**
@@ -140,20 +118,22 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param array|null $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                         Leave null to autodetermine and memoize query.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine and memoize query.
 	 * @return string The custom canonical URL, if any.
 	 */
 	public static function get_generated_url( $args = null ) {
 		return isset( $args )
-			? static::get_generated_url_from_args( $args )
-			: static::get_generated_url_from_query();
+			? self::get_generated_url_from_args( $args )
+			: self::get_generated_url_from_query();
 	}
 
 	/**
 	 * Returns the custom canonical URL, based on query.
 	 *
 	 * @since 5.0.0
+	 * @since 5.2.0 1. Now makes a relative path absolute.
+	 *              2. Now returns the custom author archive canonical URL from user meta.
 	 *
 	 * @return string The custom canonical URL, if any.
 	 */
@@ -161,7 +141,8 @@ class URI {
 
 		if ( Query::is_real_front_page() ) {
 			if ( Query::is_static_front_page() ) {
-				$url = Data\Plugin::get_option( 'homepage_canonical' )
+				$url =
+					   Data\Plugin::get_option( 'homepage_canonical' )
 					?: Data\Plugin\Post::get_meta_item( '_genesis_canonical_uri' );
 			} else {
 				$url = Data\Plugin::get_option( 'homepage_canonical' );
@@ -172,20 +153,25 @@ class URI {
 			$url = Data\Plugin\Term::get_meta_item( 'canonical' );
 		} elseif ( \is_post_type_archive() ) {
 			$url = Data\Plugin\PTA::get_meta_item( 'canonical' );
+		} elseif ( Query::is_author() ) {
+			$url = Data\Plugin\User::get_current_post_author_meta_item( 'canonical' );
 		}
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
-		if ( URI\Utils::url_matches_blog_domain( $url ) )
-			$url = URI\Utils::set_preferred_url_scheme( $url );
-
-		return \sanitize_url( $url, [ 'https', 'http' ] );
+		return \sanitize_url(
+			URI\Utils::make_absolute_current_scheme_url( $url ),
+			[ 'https', 'http' ],
+		);
 	}
 
 	/**
 	 * Returns the custom canonical URL, based on arguments.
 	 *
 	 * @since 5.0.0
+	 * @since 5.2.0 1. Now makes a relative path absolute.
+	 *              2. Now returns the custom author archive canonical URL from user meta.
 	 *
 	 * @param array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
 	 * @return string The custom canonical URL, if any.
@@ -197,7 +183,8 @@ class URI {
 		switch ( get_query_type_from_args( $args ) ) {
 			case 'single':
 				if ( Query::is_static_front_page( $args['id'] ) ) {
-					$url = Data\Plugin::get_option( 'homepage_canonical' )
+					$url =
+						   Data\Plugin::get_option( 'homepage_canonical' )
 						?: Data\Plugin\Post::get_meta_item( '_genesis_canonical_uri', $args['id'] );
 				} else {
 					$url = Data\Plugin\Post::get_meta_item( '_genesis_canonical_uri', $args['id'] );
@@ -211,14 +198,18 @@ class URI {
 				break;
 			case 'pta':
 				$url = Data\Plugin\PTA::get_meta_item( 'canonical', $args['pta'] );
+				break;
+			case 'user':
+				$url = Data\Plugin\User::get_meta_item( 'canonical', $args['uid'] );
 		}
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
-		if ( URI\Utils::url_matches_blog_domain( $url ) )
-			$url = URI\Utils::set_preferred_url_scheme( $url );
-
-		return \sanitize_url( $url, [ 'https', 'http' ] );
+		return \sanitize_url(
+			URI\Utils::make_absolute_current_scheme_url( $url ),
+			[ 'https', 'http' ],
+		);
 	}
 
 	/**
@@ -231,21 +222,21 @@ class URI {
 	public static function get_generated_url_from_query() {
 
 		if ( Query::is_real_front_page() ) {
-			$url = static::get_front_page_url();
+			$url = self::get_front_page_url();
 		} elseif ( Query::is_singular() ) {
-			$url = static::get_singular_url();
+			$url = self::get_singular_url();
 		} elseif ( Query::is_archive() ) {
 			if ( Query::is_editable_term() ) {
-				$url = static::get_term_url();
+				$url = self::get_term_url();
 			} elseif ( \is_post_type_archive() ) {
-				$url = static::get_pta_url();
+				$url = self::get_pta_url();
 			} elseif ( Query::is_author() ) {
-				$url = static::get_author_url();
+				$url = self::get_author_url();
 			} elseif ( \is_date() ) {
-				$url = static::get_date_url();
+				$url = self::get_date_url();
 			}
 		} elseif ( Query::is_search() ) {
-			$url = static::get_search_url();
+			$url = self::get_search_url();
 		}
 
 		return $url ?? '' ?: '';
@@ -266,22 +257,22 @@ class URI {
 		switch ( get_query_type_from_args( $args ) ) {
 			case 'single':
 				if ( Query::is_static_front_page( $args['id'] ) ) {
-					$url = static::get_bare_front_page_url();
+					$url = self::get_bare_front_page_url();
 				} else {
-					$url = static::get_bare_singular_url( $args['id'] );
+					$url = self::get_bare_singular_url( $args['id'] );
 				}
 				break;
 			case 'term':
-				$url = static::get_bare_term_url( $args['id'], $args['tax'] );
+				$url = self::get_bare_term_url( $args['id'], $args['tax'] );
 				break;
 			case 'homeblog':
-				$url = static::get_bare_front_page_url();
+				$url = self::get_bare_front_page_url();
 				break;
 			case 'pta':
-				$url = static::get_bare_pta_url( $args['pta'] );
+				$url = self::get_bare_pta_url( $args['pta'] );
 				break;
 			case 'user':
-				$url = static::get_bare_author_url( $args['uid'] );
+				$url = self::get_bare_author_url( $args['uid'] );
 		}
 
 		return $url ?: '';
@@ -299,7 +290,8 @@ class URI {
 
 		$url = URI\Utils::slash_front_page_url( Data\Blog::get_front_page_url() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		$page = max( Query::paged(), Query::page() );
 
@@ -320,15 +312,16 @@ class URI {
 	 * @return string The home URL.
 	 */
 	public static function get_bare_front_page_url() {
-		return umemo( __METHOD__ ) ?? umemo(
-			__METHOD__,
-			\sanitize_url(
-				URI\Utils::slash_front_page_url( URI\Utils::set_preferred_url_scheme(
-					Data\Blog::get_front_page_url(),
-				) ),
-				[ 'https', 'http' ],
-			),
-		);
+		return umemo( __METHOD__ )
+			?? umemo(
+				__METHOD__,
+				\sanitize_url(
+					URI\Utils::slash_front_page_url( URI\Utils::set_preferred_url_scheme(
+						Data\Blog::get_front_page_url(),
+					) ),
+					[ 'https', 'http' ],
+				),
+			);
 	}
 
 	/**
@@ -336,17 +329,18 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param int|null $post_id The page ID. Leave null to autodetermine.
+	 * @param ?int $post_id The page ID. Leave null to autodetermine.
 	 * @return string The singular URL.
 	 */
 	public static function get_singular_url( $post_id = null ) {
 
 		if ( isset( $post_id ) )
-			return static::get_bare_singular_url( $post_id );
+			return self::get_bare_singular_url( $post_id );
 
 		$url = \get_permalink( Query::get_the_real_id() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		if ( Query::is_singular_archive() ) {
 			// Singular archives, like blog pages and shop pages, use the pagination base with 'paged'.
@@ -372,14 +366,15 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param int|null $post_id The post ID to get the URL from. Leave null to autodetermine.
+	 * @param ?int $post_id The post ID to get the URL from. Leave null to autodetermine.
 	 * @return string The singular canonical URL without complex optimizations.
 	 */
 	public static function get_bare_singular_url( $post_id = null ) {
 
 		$url = \get_permalink( $post_id );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( $url ),
@@ -393,14 +388,14 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param int|null $term_id  The term ID. Leave null to autodetermine.
-	 * @param string   $taxonomy The taxonomy. Leave empty to autodetermine.
+	 * @param ?int   $term_id  The term ID. Leave null to autodetermine.
+	 * @param string $taxonomy The taxonomy. Leave empty to autodetermine.
 	 * @return string The taxonomical canonical URL, if any.
 	 */
 	public static function get_term_url( $term_id = null, $taxonomy = '' ) {
 
 		if ( isset( $term_id ) )
-			return static::get_bare_term_url( $term_id, $taxonomy );
+			return self::get_bare_term_url( $term_id, $taxonomy );
 
 		$url = \get_term_link( Query::get_the_real_id(), $taxonomy );
 
@@ -422,8 +417,8 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param int|null $term_id  The term ID.
-	 * @param string   $taxonomy The taxonomy. Leave empty to autodetermine.
+	 * @param ?int   $term_id  The term ID.
+	 * @param string $taxonomy The taxonomy. Leave empty to autodetermine.
 	 * @return string The taxonomical canonical URL, if any.
 	 */
 	public static function get_bare_term_url( $term_id = null, $taxonomy = '' ) {
@@ -457,11 +452,12 @@ class URI {
 	public static function get_pta_url( $post_type = null ) {
 
 		if ( isset( $post_type ) )
-			return static::get_bare_pta_url( $post_type );
+			return self::get_bare_pta_url( $post_type );
 
 		$url = \get_post_type_archive_link( $post_type ?? Query::get_current_post_type() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( URI\Utils::add_pagination_to_url(
@@ -478,15 +474,16 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param null|string $post_type The post type archive's post type.
-	 *                          Leave null to autodetermine query and allow pagination.
+	 * @param ?string $post_type The post type archive's post type.
+	 *                      Leave null to autodetermine query and allow pagination.
 	 * @return string The post type archive canonical URL, if any.
 	 */
 	public static function get_bare_pta_url( $post_type = null ) {
 
 		$url = \get_post_type_archive_link( $post_type ?? Query::get_current_post_type() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( $url ),
@@ -505,11 +502,12 @@ class URI {
 	public static function get_author_url( $id = null ) {
 
 		if ( isset( $id ) )
-			return static::get_bare_author_url( $id );
+			return self::get_bare_author_url( $id );
 
 		$url = \get_author_posts_url( Query::get_the_real_id() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( URI\Utils::add_pagination_to_url(
@@ -526,14 +524,15 @@ class URI {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param int|null $id The author ID. Leave null to autodetermine.
+	 * @param ?int $id The author ID. Leave null to autodetermine.
 	 * @return string The author canonical URL, if any.
 	 */
 	public static function get_bare_author_url( $id = null ) {
 
 		$url = \get_author_posts_url( $id ?? Query::get_the_real_id() );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( $url ),
@@ -555,7 +554,7 @@ class URI {
 	public static function get_date_url( $year = null, $month = null, $day = null ) {
 
 		if ( isset( $year ) )
-			return static::get_bare_date_url( $year, $month, $day );
+			return self::get_bare_date_url( $year, $month, $day );
 
 		$year  = \get_query_var( 'year' );
 		$month = \get_query_var( 'monthnum' );
@@ -569,7 +568,8 @@ class URI {
 			$url = \get_year_link( $year );
 		}
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( URI\Utils::add_pagination_to_url(
@@ -601,7 +601,8 @@ class URI {
 			$url = \get_year_link( $year );
 		}
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( $url ),
@@ -622,11 +623,12 @@ class URI {
 	public static function get_search_url( $search_query = null ) {
 
 		if ( isset( $search_query ) )
-			return static::get_bare_search_url( $search_query );
+			return self::get_bare_search_url( $search_query );
 
 		$url = \get_search_link();
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( URI\Utils::add_pagination_to_url(
@@ -650,7 +652,8 @@ class URI {
 
 		$url = \get_search_link( $search_query );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		return \sanitize_url(
 			URI\Utils::set_preferred_url_scheme( $url ),
@@ -670,6 +673,7 @@ class URI {
 	 * @since 5.0.0 1. Removed memoization thanks to optimization.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
 	 *              3. Removed option checks (unintentionally)
+	 *              4. Now returns URLs when a custom canonical URL is set.
 	 * @since 5.0.5 Reinstated missing option checks.
 	 * @todo make this a getter via $args.
 	 *
@@ -692,7 +696,7 @@ class URI {
 			$get = false;
 		}
 
-		return $get ? static::get_generated_paged_urls() : [ '', '' ];
+		return $get ? self::get_generated_paged_urls() : [ '', '' ];
 	}
 
 	/**
@@ -714,7 +718,7 @@ class URI {
 
 		// If this page is not the last, create a next-URL.
 		if ( ( $page + 1 ) <= $numpages ) {
-			$url = URI\Utils::remove_pagination_from_url( static::get_generated_url() );
+			$url = URI\Utils::remove_pagination_from_url( self::get_generated_url() );
 
 			if ( $url )
 				$next = \sanitize_url(
@@ -725,7 +729,7 @@ class URI {
 
 		// If this page is not the first, create a prev-URL.
 		if ( $page > 1 ) {
-			$url ??= URI\Utils::remove_pagination_from_url( static::get_generated_url() );
+			$url ??= URI\Utils::remove_pagination_from_url( self::get_generated_url() );
 
 			if ( $url )
 				$prev = \sanitize_url(
@@ -748,10 +752,12 @@ class URI {
 	 *              2. Now redirects post type archives.
 	 * @since 5.0.0 1. Now expects an ID before getting a post meta item.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
+	 * @since 5.1.0 Now supports `homepage_redirect`.
+	 * @since 5.2.0 Now returns the custom author archive redirect from user meta.
 	 *
-	 * @param array|null $args    The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                            Leave null to autodetermine query.
-	 * @return string The canonical URL if found, empty string otherwise.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine query.
+	 * @return string The redirect URL if found, empty string otherwise.
 	 */
 	public static function get_redirect_url( $args = null ) {
 
@@ -761,7 +767,8 @@ class URI {
 			switch ( get_query_type_from_args( $args ) ) {
 				case 'single':
 					if ( Query::is_static_front_page( $args['id'] ) ) {
-						$url = Data\Plugin::get_option( 'homepage_redirect' )
+						$url =
+							   Data\Plugin::get_option( 'homepage_redirect' )
 							?: Data\Plugin\Post::get_meta_item( 'redirect', $args['id'] );
 					} else {
 						$url = Data\Plugin\Post::get_meta_item( 'redirect', $args['id'] );
@@ -775,11 +782,15 @@ class URI {
 					break;
 				case 'pta':
 					$url = Data\Plugin\PTA::get_meta_item( 'redirect', $args['pta'] );
+					break;
+				case 'user':
+					$url = Data\Plugin\User::get_meta_item( 'redirect', $args['uid'] );
 			}
 		} else {
 			if ( Query::is_real_front_page() ) {
 				if ( Query::is_static_front_page() ) {
-					$url = Data\Plugin::get_option( 'homepage_redirect' )
+					$url =
+						   Data\Plugin::get_option( 'homepage_redirect' )
 						?: Data\Plugin\Post::get_meta_item( 'redirect' );
 				} else {
 					$url = Data\Plugin::get_option( 'homepage_redirect' );
@@ -790,11 +801,15 @@ class URI {
 				$url = Data\Plugin\Term::get_meta_item( 'redirect' );
 			} elseif ( \is_post_type_archive() ) {
 				$url = Data\Plugin\PTA::get_meta_item( 'redirect' );
+			} elseif ( Query::is_author() ) {
+				$url = Data\Plugin\User::get_current_post_author_meta_item( 'redirect' );
 			}
 		}
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
+		// Protocol check only. Sanitize::redirect_url() also rewrites external URLs.
 		return \sanitize_url( $url, [ 'https', 'http' ] );
 	}
 
@@ -811,15 +826,19 @@ class URI {
 		if (
 			   ! Data\Plugin::get_option( 'shortlink_tag' )
 			|| Query::is_real_front_page()
-		) return '';
+		) {
+			return '';
+		}
 
-		return static::get_generated_shortlink_url();
+		return self::get_generated_shortlink_url();
 	}
 
 	/**
 	 * Generates shortlink URL.
 	 *
 	 * @since 5.0.0
+	 * @since 5.2.0 1. Now drops a query key the shortlink already set.
+	 *              2. Custom taxonomies now use the registered query variable, or `taxonomy` and `term` when that variable is off.
 	 * @todo Append queries of other plugins for other pages as well?
 	 *
 	 * @return string The shortlink URL.
@@ -836,15 +855,25 @@ class URI {
 
 				if ( $slug )
 					$query = [ 'tag' => $slug ];
-			} elseif ( Query::is_tag() || Query::is_tax() ) {
+			} elseif ( Query::is_tax() ) {
 				// Generate shortlink for object type and slug.
 				$object = \get_queried_object();
 
 				$tax  = $object->taxonomy ?? '';
 				$slug = $object->slug ?? '';
 
-				if ( $tax && $slug )
-					$query = [ $tax => $slug ];
+				if ( $tax && $slug ) {
+					$tax_obj = \get_taxonomy( $tax );
+
+					if ( $tax_obj && $tax_obj->query_var ) {
+						$query = [ $tax_obj->query_var => $slug ];
+					} else {
+						$query = [
+							'taxonomy' => $tax,
+							'term'     => $slug,
+						];
+					}
+				}
 			} elseif ( \is_date() && isset( $GLOBALS['wp_query']->query ) ) {
 				// FIXME: Make Trac ticket: WP doesn't accept paged parameters w/ date parameters. It'll lead to the homepage.
 				$_query = $GLOBALS['wp_query']->query;
@@ -862,7 +891,8 @@ class URI {
 			$query = [ 's' => \get_search_query( false ) ];
 		}
 
-		if ( empty( $query ) ) return '';
+		if ( empty( $query ) )
+			return '';
 
 		$page  = Query::page();
 		$paged = Query::paged();
@@ -873,15 +903,20 @@ class URI {
 			$query += [ 'paged' => $paged ];
 		}
 
-		$query       = http_build_query( $query );
-		$extra_query = parse_url( static::get_generated_url( null ), \PHP_URL_QUERY );
+		$extra_query = parse_url( self::get_generated_url(), \PHP_URL_QUERY );
 
-		if ( $extra_query )
-			$query .= "&$extra_query";
+		if ( $extra_query ) {
+			parse_str( $extra_query, $extra );
+
+			// Drop keys the shortlink already set. Left-hand keys win.
+			$query += $extra;
+		}
+
+		$query = http_build_query( $query );
 
 		return \sanitize_url(
 			URI\Utils::append_query_to_url(
-				static::get_bare_front_page_url(),
+				self::get_bare_front_page_url(),
 				$query,
 			),
 			[ 'https', 'http' ],

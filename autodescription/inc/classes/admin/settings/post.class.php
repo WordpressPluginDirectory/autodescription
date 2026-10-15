@@ -8,19 +8,18 @@ namespace The_SEO_Framework\Admin\Settings;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\is_headless;
+use function The_SEO_Framework\is_headless;
 
-use \The_SEO_Framework\{
-	Admin,
-	Data,
-	Helper\Post_Type,
-	Helper\Query,
-	Helper\Template,
+use The_SEO_Framework\Data;
+use The_SEO_Framework\Helper\{
+	Post_Type,
+	Query,
+	Template,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -65,24 +64,28 @@ final class Post {
 	 */
 	public static function prepare_meta_box( $post_type ) {
 
-		/**
-		 * @since 2.0.0
-		 * @param bool $show_seobox Whether to show the SEO meta box.
-		 */
 		if (
 			   ! Query::is_post_edit()
 			|| ! Post_Type::is_supported( $post_type )
-			|| ! \apply_filters( 'the_seo_framework_seobox_output', true )
-		) return;
+			|| ! (
+				/**
+				 * @since 2.0.0
+				 * @param bool $show_seobox Whether to show the SEO meta box.
+				 */
+				\apply_filters( 'the_seo_framework_seobox_output', true )
+			)
+		) {
+			return;
+		}
 
 		$box_id = 'tsf-inpost-box';
 
-		// TODO 5.1.0 add the_seo_framework_post_metabox_args, and deprecate filters below?
+		// TODO 5.1.0 add the_seo_framework_post_metabox_args, and deprecate filters below? whoops, missed: TODO 5.2.0
 		// -> Even if we'll concede to using Gutenberg, one day, dismissing this, this is still useful for Classic Editor.
 		\add_meta_box(
 			$box_id,
 			\esc_html__( 'SEO Settings', 'autodescription' ),
-			[ static::class, 'meta_box' ],
+			[ self::class, 'meta_box' ],
 			null, // We used to forward hook $post_type, which redundantly forces WP to regenerate the current screen type.
 			/**
 			 * @since 2.9.0
@@ -94,15 +97,15 @@ final class Post {
 			 * @param string $default Accepts 'high', 'default', 'low'
 			 *                        Defaults to high, this box is seen right below the post/page edit screen.
 			 */
-			(string) \apply_filters( 'the_seo_framework_metabox_priority', 'high' )
+			(string) \apply_filters( 'the_seo_framework_metabox_priority', 'high' ),
 		);
 
 		$screen_id = \get_current_screen()->id;
 
-		\add_filter( "postbox_classes_{$screen_id}_{$box_id}", [ static::class, 'add_postbox_class' ] );
+		\add_filter( "postbox_classes_{$screen_id}_{$box_id}", [ self::class, 'add_postbox_class' ] );
 
 		if ( ! is_headless( 'settings' ) && Query::is_static_front_page( Query::get_the_real_id() ) ) {
-			$output_homepage_warning = [ static::class, 'output_homepage_warning' ];
+			$output_homepage_warning = [ self::class, 'output_homepage_warning' ];
 			\add_action( 'the_seo_framework_pre_page_inpost_general_tab', $output_homepage_warning );
 			\add_action( 'the_seo_framework_pre_page_inpost_visibility_tab', $output_homepage_warning );
 			\add_action( 'the_seo_framework_pre_page_inpost_social_tab', $output_homepage_warning );
@@ -117,19 +120,25 @@ final class Post {
 	 * @since 5.0.0 1. Removed third parameter: $use_tabs.
 	 *              2. Moved from `\The_SEO_Framework\Bridges`.
 	 *              3. Renamed from `_flex_nav_tab_wrapper`.
+	 * @example $tabs `[ 'general' => [ 'name' => 'General', 'callback' => [ \The_SEO_Framework\Admin\Settings\Post::class, 'general_tab' ], 'dashicon' => 'admin-generic' ] ]`
 	 *
 	 * @param string $id   The nav-tab ID.
 	 * @param array  $tabs {
 	 *     The tab creation arguments keyed by tab name.
 	 *
-	 *     @type string   $name     Tab name.
-	 *     @type callable $callback Output function.
-	 *     @type string   $dashicon The dashicon to use.
-	 *     @type mixed    $args     Optional callback function args. These arguments
-	 *                              will be extracted to variables in scope of the view.
+	 *     @type array {$tab} {
+	 *         The tab creation arguments.
+	 *
+	 *         @type string   $name     Tab name.
+	 *         @type callable $callback Output function.
+	 *         @type string   $dashicon The dashicon to use.
+	 *         @type mixed    $args     Optional callback arguments. Passed as individual
+	 *                                  arguments to the callback.
+	 *     }
 	 * }
 	 */
 	public static function flex_nav_tab_wrapper( $id, $tabs = [] ) {
+
 		Template::output_view( 'post/wrap-nav', $id, $tabs );
 		Template::output_view( 'post/wrap-content', $id, $tabs );
 	}
@@ -143,7 +152,10 @@ final class Post {
 	 */
 	public static function meta_box() {
 
-		\wp_nonce_field( Data\Admin\Post::$nonce_action, Data\Admin\Post::$nonce_name );
+		\wp_nonce_field(
+			Data\Admin\Post::SAVE_NONCES['post-edit']['action'],
+			Data\Admin\Post::SAVE_NONCES['post-edit']['name'],
+		);
 
 		/**
 		 * @since 2.9.0
@@ -182,6 +194,9 @@ final class Post {
 	/**
 	 * Outputs the Homepage SEO settings warning.
 	 *
+	 * @hook the_seo_framework_pre_page_inpost_general_tab 10
+	 * @hook the_seo_framework_pre_page_inpost_visibility_tab 10
+	 * @hook the_seo_framework_pre_page_inpost_social_tab 10
 	 * @since 5.0.0
 	 */
 	public static function output_homepage_warning() {
@@ -196,11 +211,14 @@ final class Post {
 	 *              2. Renamed from `_general_tab`.
 	 */
 	public static function general_tab() {
+
 		/**
 		 * @since 2.9.0
 		 */
 		\do_action( 'the_seo_framework_pre_page_inpost_general_tab' );
+
 		Template::output_view( 'post/settings', 'general' );
+
 		/**
 		 * @since 2.9.0
 		 */
@@ -215,11 +233,14 @@ final class Post {
 	 *              2. Renamed from `_visibility_tab`.
 	 */
 	public static function visibility_tab() {
+
 		/**
 		 * @since 2.9.0
 		 */
 		\do_action( 'the_seo_framework_pre_page_inpost_visibility_tab' );
+
 		Template::output_view( 'post/settings', 'visibility' );
+
 		/**
 		 * @since 2.9.0
 		 */
@@ -234,11 +255,14 @@ final class Post {
 	 *              2. Renamed from `_social_tab`.
 	 */
 	public static function social_tab() {
+
 		/**
 		 * @since 2.9.0
 		 */
 		\do_action( 'the_seo_framework_pre_page_inpost_social_tab' );
+
 		Template::output_view( 'post/settings', 'social' );
+
 		/**
 		 * @since 2.9.0
 		 */

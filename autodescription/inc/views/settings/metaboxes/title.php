@@ -6,23 +6,23 @@
 
 namespace The_SEO_Framework;
 
-\defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) or die;
+( \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) ) or die;
 
-use \The_SEO_Framework\Admin\Settings\Layout\{
+use The_SEO_Framework\Admin\Settings\Layout\{
 	HTML,
 	Input,
 };
-use \The_SEO_Framework\Data\Filter\Sanitize;
-use \The_SEO_Framework\Helper\Format\{
+use The_SEO_Framework\Data\Filter\Sanitize;
+use The_SEO_Framework\Helper\Format\{
 	Markdown,
 	Strings,
 };
 
-// phpcs:disable, WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
+// phpcs:disable WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2016 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2016 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -53,7 +53,7 @@ switch ( $instance ) :
 
 		$post_title = \esc_html( Strings::hellip_if_over(
 			Meta\Title::get_post_title( $latest_post_id ) ?: \__( 'Example Post', 'autodescription' ),
-			60
+			60,
 		) );
 
 		$cat_prefix = \esc_html( \_x( 'Category:', 'category archive title prefix', 'default' ) );
@@ -87,13 +87,13 @@ switch ( $instance ) :
 			<p>
 				<span class="tsf-title-additions-example-left hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_post_left );
 					?>
 				</span>
 				<span class="tsf-title-additions-example-right hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_post_right );
 					?>
 				</span>
@@ -103,25 +103,25 @@ switch ( $instance ) :
 			<p>
 				<span class="tsf-title-additions-example-left tsf-title-tax-prefix hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_tax_left_full );
 					?>
 				</span>
 				<span class="tsf-title-additions-example-right tsf-title-tax-prefix hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_tax_right_full );
 					?>
 				</span>
 				<span class="tsf-title-additions-example-left tsf-title-tax-noprefix hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_tax_left );
 					?>
 				</span>
 				<span class="tsf-title-additions-example-right tsf-title-tax-noprefix hidden">
 					<?php
-					// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 					echo HTML::code_wrap_noesc( $example_tax_right );
 					?>
 				</span>
@@ -190,7 +190,7 @@ switch ( $instance ) :
 			 * @since 2.6.0
 			 * @param array $tabs The default tabs.
 			 */
-			(array) \apply_filters( 'the_seo_framework_title_settings_tabs', $tabs )
+			(array) \apply_filters( 'the_seo_framework_title_settings_tabs', $tabs ),
 		);
 		break;
 
@@ -213,7 +213,7 @@ switch ( $instance ) :
 						\esc_attr( Input::get_field_name( 'title_separator' ) ),
 						\esc_attr( Input::get_field_id( "title_separator_{$name}" ) ),
 						\esc_attr( $name ),
-						// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- make_data_attributes() escapes.
+						// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- make_data_attributes() escapes.
 						HTML::make_data_attributes( [ 'entity' => \esc_html( $html ) ] ), // This will double escape, but we found no issues.
 						\checked( $default_title_separator, $name, false ),
 						\esc_html( $html ),
@@ -234,7 +234,7 @@ switch ( $instance ) :
 			\sprintf(
 				/* translators: %s = HTML tag example */
 				\__( 'This strips HTML tags, like %s, from the title. Disable this option to display generated HTML tags as plain text in meta titles.', 'autodescription' ),
-				'<code>&amp;lt;strong&amp;gt;</code>' // Double escaped HTML (&amp;) for attribute display.
+				'<code>&amp;lt;strong&amp;gt;</code>', // Double escaped HTML (&amp;) for attribute display.
 			),
 			'',
 			false,
@@ -262,7 +262,7 @@ switch ( $instance ) :
 			</label>
 		</p>
 		<p class=tsf-title-wrap>
-			<input type=text name="<?php Input::field_name( 'site_title' ); ?>" class=large-text id="<?php Input::field_id( 'site_title' ); ?>" placeholder="<?= \esc_html( Sanitize::metadata_content( Data\Blog::get_filtered_blog_name() ) ) ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'site_title' ) ) ) ?>" autocomplete=off>
+			<input type=text name="<?php Input::field_name( 'site_title' ); ?>" class=large-text id="<?php Input::field_id( 'site_title' ); ?>" placeholder="<?= \esc_html( Sanitize::metadata_content( Data\Blog::get_filtered_blog_name() ) ) ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'site_title' ) ) ) ?>" autocomplete=off data-tsf-proposed="<?= \esc_attr( Sanitize::metadata_content( Data\Blog::get_filtered_blog_name() ) ) ?>">
 		</p>
 		<?php
 		HTML::description( \__( 'This option does not affect header titles displayed directly on your website.', 'autodescription' ) );
@@ -277,7 +277,7 @@ switch ( $instance ) :
 					<label for="<?php Input::field_id( 'title_location_left' ); ?>">
 						<span><?php \esc_html_e( 'Left:', 'autodescription' ); ?></span>
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+						// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 						echo HTML::code_wrap_noesc( $args['examples']['left'] );
 						?>
 					</label>
@@ -287,7 +287,7 @@ switch ( $instance ) :
 					<label for="<?php Input::field_id( 'title_location_right' ); ?>">
 						<span><?php \esc_html_e( 'Right:', 'autodescription' ); ?></span>
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
+						// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped.
 						echo HTML::code_wrap_noesc( $args['examples']['right'] );
 						?>
 					</label>

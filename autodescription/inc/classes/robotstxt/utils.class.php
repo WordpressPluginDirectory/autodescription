@@ -8,17 +8,16 @@ namespace The_SEO_Framework\RobotsTXT;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\umemo;
+use function The_SEO_Framework\umemo;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
-	Helper\Query,
 	Meta,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -46,12 +45,13 @@ class Utils {
 	 * Returns a list of filterable user-agents that can be blocked.
 	 *
 	 * @since 5.1.0
+	 * @example $agents `[ 'Amazonbot' => [ 'by' => 'Amazon', 'link' => 'https://developer.amazon.com/amazonbot' ] ]`
 	 *
 	 * @param string $type The type of user-agents to get. Accepts 'ai' and 'seo'.
 	 * @return array {
 	 *     A list of user-agents with extra info.
 	 *
-	 *     @type array $user_agent {
+	 *     @type array {$user_agent} {
 	 *         The user-agent's information.
 	 *
 	 *         @type string $by   The entity behind the user-agent.
@@ -105,39 +105,39 @@ class Utils {
 				break;
 			case 'seo':
 				$agents = [
-					'AhrefsBot'        => [
+					'AhrefsBot'       => [
 						'by'   => 'Ahrefs',
 						'link' => 'https://ahrefs.com/robot',
 					],
-					'AhrefsSiteAudit ' => [
+					'AhrefsSiteAudit' => [
 						'by'   => 'Ahrefs',
 						'link' => 'https://ahrefs.com/robot/site-audit',
 					],
-					'barkrowler'       => [
+					'barkrowler'      => [
 						'by'   => 'Babbar',
 						'link' => 'https://www.babbar.tech/crawler',
 					],
-					'DataForSeoBot'    => [
+					'DataForSeoBot'   => [
 						'by'   => 'DataForSEO',
 						'link' => 'https://dataforseo.com/dataforseo-bot',
 					],
-					'dotbot'           => [
+					'dotbot'          => [
 						'by'   => 'Moz',
 						'link' => 'https://moz.com/help/moz-procedures/crawlers/dotbot',
 					],
-					'rogerbot'         => [
+					'rogerbot'        => [
 						'by'   => 'Moz',
 						'link' => 'https://moz.com/help/moz-procedures/crawlers/rogerbot',
 					],
-					'SemrushBot'       => [
+					'SemrushBot'      => [
 						'by'   => 'SEMrush',
 						'link' => 'https://www.semrush.com/bot/',
 					],
-					'SiteAuditBot'     => [
+					'SiteAuditBot'    => [
 						'by'   => 'SEMrush',
 						'link' => 'https://www.semrush.com/bot/',
 					],
-					'SemrushBot-BA'    => [
+					'SemrushBot-BA'   => [
 						'by'   => 'SEMrush',
 						'link' => 'https://www.semrush.com/bot/',
 					],
@@ -147,7 +147,7 @@ class Utils {
 		/**
 		 * @since 5.1.0
 		 * @param array $agents The user-agent list for $type.
-		 * @param arrary $type  The agent type requested by the method caller.
+		 * @param array $type   The agent type requested by the method caller.
 		 */
 		return (array) \apply_filters(
 			'the_seo_framework_robots_blocked_user_agents',
@@ -165,8 +165,10 @@ class Utils {
 	 * @return bool Whether the robots.txt file exists.
 	 */
 	public static function has_root_robots_txt() {
-		// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition -- I know.
-		if ( null !== $memo = umemo( __METHOD__ ) ) return $memo;
+
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition -- I know.
+		if ( null !== $memo = umemo( __METHOD__ ) )
+			return $memo;
 
 		// Ensure get_home_path() is declared.
 		if ( ! \function_exists( 'get_home_path' ) )
@@ -174,7 +176,7 @@ class Utils {
 
 		$path = \get_home_path() . 'robots.txt';
 
-		// phpcs:ignore, TSF.Performance.Functions.PHP -- we use path, not URL.
+		// phpcs:ignore TSF.Performance.Functions.PHP -- we use path, not URL.
 		return umemo( __METHOD__, file_exists( $path ) );
 	}
 
@@ -191,13 +193,14 @@ class Utils {
 	 */
 	public static function get_robots_txt_url() {
 
-		// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition -- I know.
-		if ( null !== $memo = umemo( __METHOD__ ) ) return $memo;
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition -- I know.
+		if ( null !== $memo = umemo( __METHOD__ ) )
+			return $memo;
 
 		if ( $GLOBALS['wp_rewrite']->using_permalinks() && ! Data\Blog::is_subdirectory_installation() ) {
 			$home = \trailingslashit( Meta\URI\Utils::set_preferred_url_scheme( Meta\URI\Utils::get_site_host() ) );
 			$path = "{$home}robots.txt";
-		} elseif ( static::has_root_robots_txt() ) {
+		} elseif ( self::has_root_robots_txt() ) {
 			// TODO: This URL is wrong on subdirectory installations? Use Meta\URI\Utils::get_site_host() instead?
 			$home = \trailingslashit( Meta\URI\Utils::set_preferred_url_scheme( \get_option( 'home' ) ) );
 			$path = "{$home}robots.txt";

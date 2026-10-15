@@ -8,18 +8,20 @@ namespace The_SEO_Framework\Data\Plugin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\is_headless;
+use function The_SEO_Framework\is_headless;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
-	Helper\Post_Type,
-	Helper\Query,
 	Traits\Property_Refresher,
+};
+use The_SEO_Framework\Helper\{
+	Post_Type,
+	Query,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -41,6 +43,8 @@ use \The_SEO_Framework\{
  * @since 5.1.0 Added the Property_Refresher trait.
  * @access protected
  *         Use tsf()->data()->plugin()->pta() instead.
+ *
+ * @NOTE: All static:: calls within this class are intentional due to Property_Refresher trait.
  */
 class PTA {
 	use Property_Refresher;
@@ -74,10 +78,7 @@ class PTA {
 
 	/**
 	 * Returns all post type archive meta.
-	 *
-	 * We do not test whether a post type is supported, for it'll conflict with data-fills on the
-	 * SEO settings page. This meta should never get called on the front-end if the post type is
-	 * disabled, anyway, for we never query post types externally, aside from the SEO settings page.
+	 * Returns the default meta when the post type is empty or `Post_Type::is_supported()` is false.
 	 *
 	 * @since 4.2.0
 	 * @since 5.0.0 1. The first parameter may now be empty to autodetermine post type.

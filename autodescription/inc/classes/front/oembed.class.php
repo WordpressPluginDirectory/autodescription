@@ -8,14 +8,14 @@ namespace The_SEO_Framework\Front;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Meta,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -68,7 +68,7 @@ final class OEmbed {
 			$image_details = current( Meta\Image::get_image_details(
 				[ 'id' => $post->ID ],
 				true,
-				'oembed'
+				'oembed',
 			) );
 
 			if ( $image_details && $image_details['url'] && $image_details['width'] && $image_details['height'] ) {

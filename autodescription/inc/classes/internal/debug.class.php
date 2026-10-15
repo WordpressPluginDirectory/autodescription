@@ -8,24 +8,21 @@ namespace The_SEO_Framework\Internal;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\memo;
+use function The_SEO_Framework\memo;
 
-use \The_SEO_Framework\{
-	Data,
-	Front,
-};
-use \The_SEO_Framework\Helper\{
+use The_SEO_Framework\Data;
+use The_SEO_Framework\Helper\{
 	Post_Type,
 	Query,
 	Taxonomy,
 	Template,
 };
 
-// phpcs:disable, WordPress.PHP.DevelopmentFunctions -- This whole class is meant for development.
+// phpcs:disable WordPress.PHP.DevelopmentFunctions -- This whole class is meant for development.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2015 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2015 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -65,12 +62,13 @@ final class Debug {
 	 * @since 4.1.1 No longer registers a custom error handler.
 	 * @access private
 	 *
-	 * @param string $function     The function that was called.
-	 * @param string $version      The version of WordPress that deprecated the function.
-	 * @param string $replacement  Optional. The function that should have been called. Default null.
-	 *                             Expected to be escaped.
+	 * @param string $function    The function that was called.
+	 * @param string $version     The version of WordPress that deprecated the function.
+	 * @param string $replacement Optional. The function that should have been called. Default null.
+	 *                            Expected to be escaped.
 	 */
 	public static function _deprecated_function( $function, $version, $replacement = null ) { // phpcs:ignore -- Wrong asserts, copied method name.
+
 		/**
 		 * Fires when a deprecated function is called.
 		 *
@@ -82,14 +80,16 @@ final class Debug {
 		 */
 		\do_action( 'deprecated_function_run', $function, $replacement, $version );
 
-		/**
-		 * Filter whether to trigger an error for deprecated functions.
-		 *
-		 * @since WP Core 2.5.0
-		 *
-		 * @param bool $trigger Whether to trigger the error for deprecated functions. Default true.
-		 */
-		if ( \WP_DEBUG && \apply_filters( 'deprecated_function_trigger_error', true ) ) {
+		if ( \WP_DEBUG && (
+			/**
+			 * Filter whether to trigger an error for deprecated functions.
+			 *
+			 * @since WP Core 2.5.0
+			 *
+			 * @param bool $trigger Whether to trigger the error for deprecated functions. Default true.
+			 */
+			\apply_filters( 'deprecated_function_trigger_error', true )
+		) ) {
 
 			if ( isset( $replacement ) ) {
 				$message = \sprintf(
@@ -98,7 +98,7 @@ final class Debug {
 					\esc_html( $function ),
 					'<strong>' . \esc_html__( 'deprecated', 'autodescription' ) . '</strong>',
 					\esc_html( $version ) ?: 'unknown',
-					$replacement, // phpcs:ignore, WordPress.Security.EscapeOutput -- See doc comment.
+					$replacement, // phpcs:ignore WordPress.Security.EscapeOutput -- See doc comment.
 				);
 			} else {
 				$message = \sprintf(
@@ -111,8 +111,8 @@ final class Debug {
 			}
 
 			trigger_error(
-				// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
-				static::combobulate_error_message( static::get_error(), $message, \E_USER_DEPRECATED ),
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
+				self::combobulate_error_message( self::get_error(), $message, \E_USER_DEPRECATED ),
 				\E_USER_DEPRECATED,
 			);
 		}
@@ -135,6 +135,7 @@ final class Debug {
 	 * @param string $version  The version of WordPress where the message was added.
 	 */
 	public static function _doing_it_wrong( $function, $message, $version = null ) { // phpcs:ignore -- Wrong asserts, copied method name.
+
 		/**
 		 * Fires when the given function is being used incorrectly.
 		 *
@@ -146,11 +147,13 @@ final class Debug {
 		 */
 		\do_action( 'doing_it_wrong_run', $function, $message, $version );
 
-		/**
-		 * @since WP Core 3.1.0
-		 * @param bool $trigger Whether to trigger the error for _doing_it_wrong() calls. Default true.
-		 */
-		if ( \WP_DEBUG && \apply_filters( 'doing_it_wrong_trigger_error', true ) ) {
+		if ( \WP_DEBUG && (
+			/**
+			 * @since WP Core 3.1.0
+			 * @param bool $trigger Whether to trigger the error for _doing_it_wrong() calls. Default true.
+			 */
+			\apply_filters( 'doing_it_wrong_trigger_error', true )
+		) ) {
 
 			$ver_message = $version
 				/* translators: 1: plugin version */
@@ -162,13 +165,13 @@ final class Debug {
 				\esc_html__( '%1$s was called %2$s. %3$s %4$s', 'autodescription' ),
 				\esc_html( $function ),
 				'<strong>' . \esc_html__( 'incorrectly', 'autodescription' ) . '</strong>',
-				$message, // phpcs:ignore, WordPress.Security.EscapeOutput -- See doc comment.
+				$message, // phpcs:ignore WordPress.Security.EscapeOutput -- See doc comment.
 				\esc_html( $ver_message ),
 			);
 
 			trigger_error(
-				// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
-				static::combobulate_error_message( static::get_error(), $message, \E_USER_NOTICE ),
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
+				self::combobulate_error_message( self::get_error(), $message, \E_USER_NOTICE ),
 				\E_USER_NOTICE,
 			);
 		}
@@ -201,14 +204,16 @@ final class Debug {
 		 */
 		\do_action( 'the_seo_framework_inaccessible_p_or_m_run', $p_or_m, $message );
 
-		/**
-		 * Filter whether to trigger an error for _doing_it_wrong() calls.
-		 *
-		 * @since WP Core 3.1.0
-		 *
-		 * @param bool $trigger Whether to trigger the error for _doing_it_wrong() calls. Default true.
-		 */
-		if ( \WP_DEBUG && \apply_filters( 'the_seo_framework_inaccessible_p_or_m_trigger_error', true ) ) {
+		if ( \WP_DEBUG && (
+			/**
+			 * Filter whether to trigger an error for _doing_it_wrong() calls.
+			 *
+			 * @since WP Core 3.1.0
+			 *
+			 * @param bool $trigger Whether to trigger the error for _doing_it_wrong() calls. Default true.
+			 */
+			\apply_filters( 'the_seo_framework_inaccessible_p_or_m_trigger_error', true )
+		) ) {
 			$message = \sprintf(
 				/* translators: 1: Method or Property name, 2: "inaccessible", 3: Class name. 4: Message */
 				\esc_html__( '%1$s is %2$s in %3$s. %4$s', 'autodescription' ),
@@ -219,8 +224,8 @@ final class Debug {
 			);
 
 			trigger_error(
-				// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
-				static::combobulate_error_message( static::get_error(), $message, \E_USER_WARNING ),
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- combobulate_error_message escapes.
+				self::combobulate_error_message( self::get_error(), $message, \E_USER_WARNING ),
 				\E_USER_WARNING,
 			);
 		}
@@ -235,7 +240,7 @@ final class Debug {
 	 *
 	 * @since 3.2.2
 	 * @since 4.1.1 Reworked to work with any error handler.
-	 * @since 5.0.0 Now actualyl used my brain and added an automated object searcher instead of guessing.
+	 * @since 5.0.0 Now actually used my brain and added an automated object searcher instead of guessing.
 	 * @see PHP debug_backtrace()
 	 *
 	 * @return array The erroneous caller data
@@ -244,7 +249,8 @@ final class Debug {
 
 		$backtrace = debug_backtrace( \DEBUG_BACKTRACE_PROVIDE_OBJECT, 6 );
 
-		if ( ! $backtrace ) return [];
+		if ( ! $backtrace )
+			return [];
 
 		/**
 		 * Always one step before TSF:
@@ -312,6 +318,8 @@ final class Debug {
 	/**
 	 * Echos debug output.
 	 *
+	 * @hook admin_footer 10
+	 * @hook wp_footer 10
 	 * @since 2.6.0
 	 * @since 5.0.0 is now static.
 	 * @access private
@@ -328,13 +336,24 @@ final class Debug {
 	 */
 	public static function _output_debug_header() {
 
-		if ( \is_admin() && ! Query::is_term_edit() && ! Query::is_post_edit() && ! Query::is_seo_settings_page( true ) )
+		if (
+			   \is_admin()
+			&& ! (
+				   Query::is_post_edit()
+				|| Query::is_term_edit()
+				|| Query::is_seo_settings_page()
+			)
+		) {
 			return;
+		}
 
-		if ( Query::is_seo_settings_page( true ) )
-			\add_filter( 'the_seo_framework_current_object_id', static fn() => Query::get_the_front_page_id() );
+		if ( Query::is_seo_settings_page() )
+			\add_filter(
+				'the_seo_framework_current_object_id',
+				fn() => Query::get_the_front_page_id(),
+			);
 
-		// phpcs:ignore, WordPress.Security.EscapeOutput -- callee escapes.
+		// phpcs:ignore WordPress.Security.EscapeOutput -- callee escapes.
 		Template::output_view( 'debug/header' );
 	}
 
@@ -345,8 +364,8 @@ final class Debug {
 	 * @access private
 	 */
 	public static function _output_debug_query() {
-		// phpcs:ignore, WordPress.Security.EscapeOutput -- This escapes.
-		echo static::get_debug_query_output();
+		// phpcs:ignore WordPress.Security.EscapeOutput -- This escapes.
+		echo self::get_debug_query_output();
 	}
 
 	/**
@@ -356,22 +375,23 @@ final class Debug {
 	 * @access private
 	 */
 	public static function _output_debug_query_from_cache() {
-		// phpcs:ignore, WordPress.Security.EscapeOutput -- This escapes.
-		echo static::get_debug_query_output_from_cache();
+		// phpcs:ignore WordPress.Security.EscapeOutput -- This escapes.
+		echo self::get_debug_query_output_from_cache();
 	}
 
 	/**
 	 * Sets debug query cache.
 	 *
+	 * @hook the_seo_framework_do_before_output 10
 	 * @since 3.1.0 Introduced in 2.8.0, but the name changed.
 	 * @access private
 	 */
 	public static function _set_debug_query_output_cache() {
-		static::get_debug_query_output_from_cache();
+		self::get_debug_query_output_from_cache();
 	}
 
 	/**
-	 * Wraps query status booleans in human-readable code.
+	 * Wraps query status Booleans in human-readable code.
 	 *
 	 * @since 2.6.6
 	 * @global bool $multipage
@@ -380,11 +400,11 @@ final class Debug {
 	 * @return string Wrapped Query State debug output.
 	 */
 	private static function get_debug_query_output_from_cache() {
-		return memo() ?? memo( static::get_debug_query_output( 'yup' ) );
+		return memo() ?? memo( self::get_debug_query_output( 'yup' ) );
 	}
 
 	/**
-	 * Wraps query status booleans in human-readable code.
+	 * Wraps query status Booleans in human-readable code.
 	 *
 	 * @since 2.6.6
 	 * @since 4.0.0 Cleaned up global callers; only use TSF methods.
@@ -398,8 +418,7 @@ final class Debug {
 		// Start timer.
 		$_t = hrtime( true );
 
-		// phpcs:disable, WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase -- Not this file's issue.
-		// phpcs:disable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- get_defined_vars() is used later.
+		// phpcs:disable WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase -- Not this file's issue.
 		$page_id                        = Query::get_the_real_id();
 		$is_query_exploited             = Query\Utils::is_query_exploited();
 		$query_supports_seo             = Query\Utils::query_supports_seo();
@@ -434,7 +453,7 @@ final class Debug {
 		$is_tax                         = Query::is_tax();
 		$is_shop                        = Query::is_shop();
 		$is_product                     = Query::is_product();
-		$is_seo_settings_page           = Query::is_seo_settings_page( true );
+		$is_seo_settings_page           = Query::is_seo_settings_page();
 		$numpages                       = Query::numpages();
 		$is_multipage                   = Query::is_multipage();
 		$is_singular_archive            = Query::is_singular_archive();
@@ -455,9 +474,8 @@ final class Debug {
 		$is_protected                   = Data\Post::is_protected( $page_id );
 		$wp_doing_ajax                  = \wp_doing_ajax();
 		$wp_doing_cron                  = \wp_doing_cron();
-		$wp_is_rest                     = \defined( 'REST_REQUEST' ) && \REST_REQUEST; // TODO WP 6.5+ wp_is_serving_rest_request()
-		// phpcs:enable, WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase
-		// phpcs:enable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+		$wp_is_rest                     = \wp_is_serving_rest_request();
+		// phpcs:enable WordPress.NamingConventions.ValidVariableName.VariableNotSnakeCase
 
 		$timer = ( hrtime( true ) - $_t ) / 1e9;
 

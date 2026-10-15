@@ -8,23 +8,25 @@ namespace The_SEO_Framework\Meta\Robots;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use const \The_SEO_Framework\{
+use const The_SEO_Framework\{
 	ROBOTS_IGNORE_SETTINGS,
 	ROBOTS_IGNORE_PROTECTION,
 };
 
-use function \The_SEO_Framework\get_query_type_from_args;
+use function The_SEO_Framework\get_query_type_from_args;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Meta\Robots, // Yes, it is legal to share class and namespaces.
-	Helper\Query,
-	Helper\Taxonomy,
+};
+use The_SEO_Framework\Helper\{
+	Query,
+	Taxonomy,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -48,15 +50,16 @@ use \The_SEO_Framework\{
  */
 final class Args extends Factory {
 
-	// phpcs:disable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable -- You don't love PHP7.
-	// phpcs:disable, PSR2.ControlStructures.SwitchDeclaration.TerminatingComment -- You hate goto.
-	// phpcs:disable, Generic.WhiteSpace.ScopeIndent.IncorrectExact -- You hate gotoo.
+	// phpcs:disable VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable -- You don't love PHP7.
+	// phpcs:disable PSR2.ControlStructures.SwitchDeclaration.TerminatingComment -- You hate goto.
+	// phpcs:disable Generic.WhiteSpace.ScopeIndent.IncorrectExact -- You hate gotoo.
 	/**
 	 * Generates robots assertions for no[index|archive|follow].
 	 *
 	 * Yields true when "noindex/noarchive/nofollow", yields false when "index/archive/follow".
 	 *
 	 * @since 4.2.0
+	 * @since 5.2.0 Now reads the per-author robots qubit from user meta.
 	 * @generator
 	 *
 	 * @param string $type The robots generator type (noindex, nofollow...).
@@ -64,14 +67,14 @@ final class Args extends Factory {
 	protected static function assert_no( $type ) {
 
 		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use static::$args hereinafter.
-		$args = static::$args;
+		$args = static::$args; // static: allow overrides
 
 		$asserting_noindex = 'noindex' === $type;
 
 		$query_type = get_query_type_from_args( $args );
 
 		// We assert options here for a jump to meta_settings might be unaware.
-		meta_settings: if ( ! ( static::$options & ROBOTS_IGNORE_SETTINGS ) ) {
+		meta_settings: if ( ! ( static::$options & ROBOTS_IGNORE_SETTINGS ) ) { // static: allow overrides
 			$qubit = null;
 
 			switch ( $query_type ) {
@@ -83,6 +86,9 @@ final class Args extends Factory {
 					break;
 				case 'pta':
 					$qubit = (int) Data\Plugin\PTA::get_meta_item( $type, $args['pta'] );
+					break;
+				case 'user':
+					$qubit = (int) Data\Plugin\User::get_meta_item( $type, $args['uid'] );
 			}
 
 			switch ( isset( $qubit ) ) {
@@ -116,7 +122,10 @@ final class Args extends Factory {
 						yield 'globals_homepage' => (bool) Data\Plugin::get_option( "homepage_$type" );
 
 					if ( $args['id'] )
-						yield 'globals_post_type' => Robots::is_post_type_robots_set( $type, \get_post_type( $args['id'] ) );
+						yield 'globals_post_type' => Robots::is_post_type_robots_set(
+							$type,
+							\get_post_type( $args['id'] ),
+						);
 					break;
 				case 'term':
 					$asserting_noindex and yield from static::assert_noindex_query_pass( '404' );
@@ -125,30 +134,38 @@ final class Args extends Factory {
 
 					// Store values from each post type bound to the taxonomy.
 					foreach ( Taxonomy::get_post_types( $args['tax'] ) as $post_type )
-						$_is_post_type_robots_set[] = Robots::is_post_type_robots_set( $type, $post_type );
+						$_is_pt_robots_set[] = Robots::is_post_type_robots_set( $type, $post_type );
 
-					// Only enable if _all_ post types have been marked with 'no*'. Return false if no post types are found (corner case).
-					yield 'globals_post_type_all' => isset( $_is_post_type_robots_set ) && ! \in_array( false, $_is_post_type_robots_set, true );
+					// Only enable if _all_ post types have been marked with 'no*'.
+					// Do not optimize: Return false if no post types are found (corner case).
+					yield 'globals_post_type_all' => isset( $_is_pt_robots_set ) && ! \in_array( false, $_is_pt_robots_set, true );
 					break;
 				case 'pta':
 					yield 'globals_post_type' => Robots::is_post_type_robots_set( $type, $args['pta'] );
+					break;
+				case 'user':
+					$asserting_noindex and yield from self::assert_noindex_query_pass( '404' );
+
+					yield 'globals_author' => (bool) Data\Plugin::get_option( "author_$type" );
 			}
 
-		index_protection: if ( $asserting_noindex && ! ( static::$options & ROBOTS_IGNORE_PROTECTION ) ) {
+		index_protection: if ( $asserting_noindex && ! ( static::$options & ROBOTS_IGNORE_PROTECTION ) ) { // static: allow overrides
 			if ( 'single' === $query_type )
-				yield from static::assert_noindex_query_pass( 'protected' );
+				yield from static::assert_noindex_query_pass( 'protected' ); // static: allow overrides
 		}
 
 		end:;
 	}
-	// phpcs:enable, VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
-	// phpcs:enable, PSR2.ControlStructures.SwitchDeclaration.TerminatingComment
-	// phpcs:disable, Generic.WhiteSpace.ScopeIndent.IncorrectExact
+	// phpcs:enable VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
+	// phpcs:enable PSR2.ControlStructures.SwitchDeclaration.TerminatingComment
+	// phpcs:disable Generic.WhiteSpace.ScopeIndent.IncorrectExact
 
 	/**
 	 * Generates robots assertions for noindex in passes.
 	 *
 	 * @since 4.2.0
+	 * @since 5.2.0 1. The 404 pass now applies `the_seo_framework_enable_noindex_no_posts`.
+	 *              2. The 404 pass now tests whether an author has published posts.
 	 * @generator
 	 *
 	 * @param string $pass The passage to assert.
@@ -156,11 +173,34 @@ final class Args extends Factory {
 	private static function assert_noindex_query_pass( $pass ) {
 
 		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use static::$args hereinafter.
-		$args = static::$args;
+		$args = static::$args; // static: allow overrides
 
 		switch ( $pass ) {
-			case '404': // We only tests 404 terms via args.
-				yield '404' => ! Data\Term::is_term_populated( $args['id'], $args['tax'] );
+			case '404': // We only test 404 terms and authors via args.
+				$populated =
+					   'user' === get_query_type_from_args( $args )
+					? Data\User::has_published_posts( $args['uid'] )
+					: Data\Term::is_term_populated( $args['id'], $args['tax'] );
+
+				if ( $populated ) {
+					yield '404' => false;
+				} else {
+					/**
+					 * We recommend using this filter ONLY for archives that have useful content but no "posts" attached.
+					 * For example: a specially custom-developed author page for an author that never published a post.
+					 *
+					 * This filter won't run when a few other conditions for noindex have been met.
+					 *
+					 * @since 4.1.4
+					 * @since 5.2.0 Now also applies when robots meta are generated from arguments.
+					 * @link <https://github.com/sybrew/the-seo-framework/issues/194#issuecomment-864298702>
+					 * @param bool $noindex Whether to enable no posts protection.
+					 */
+					yield '404' => (bool) \apply_filters(
+						'the_seo_framework_enable_noindex_no_posts',
+						true,
+					);
+				}
 				break;
 
 			case 'protected':

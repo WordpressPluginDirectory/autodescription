@@ -1,18 +1,16 @@
 <?php
 /**
- * @package The_SEO_Framework\Classes\Data\Filter\Term
- * @subpackage The_SEO_Framework\Data\Term
+ * @package The_SEO_Framework\Classes\Data\Filter\Post
+ * @subpackage The_SEO_Framework\Data\Post
  */
 
 namespace The_SEO_Framework\Data\Filter;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\Meta;
-
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -33,10 +31,11 @@ use \The_SEO_Framework\Meta;
  * @since 5.0.0
  * @access private
  */
-class Post {
+final class Post {
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 Now stores the canonical URL fully qualified.
 	 *
 	 * @param mixed[] $meta_value Metadata value to sanitize.
 	 * @return array[] The sanitized post meta.
@@ -57,7 +56,16 @@ class Post {
 					$value = Sanitize::metadata_content( $value );
 					break;
 
-				case '_genesis_canonical_uri':
+				case '_tsf_title_no_blogname':
+				case 'exclude_local_search':
+				case 'exclude_from_archive':
+					$value = Sanitize::boolean_integer( $value );
+					break;
+
+				case '_tsf_twitter_card_type':
+					$value = Sanitize::twitter_card( $value );
+					break;
+
 				case '_social_image_url':
 					$value = \sanitize_url( $value, [ 'https', 'http' ] );
 					break;
@@ -65,6 +73,10 @@ class Post {
 				case '_social_image_id':
 					// Bound to _social_image_url.
 					$value = empty( $meta_value['_social_image_url'] ) ? 0 : \absint( $value );
+					break;
+
+				case '_genesis_canonical_uri':
+					$value = Sanitize::fully_qualified_url( $value );
 					break;
 
 				case '_genesis_noindex':
@@ -75,17 +87,6 @@ class Post {
 
 				case 'redirect':
 					$value = Sanitize::redirect_url( $value );
-					break;
-
-				case '_tsf_title_no_blogname':
-				case 'exclude_local_search':
-				case 'exclude_from_archive':
-					$value = Sanitize::boolean_integer( $value );
-					break;
-
-				case '_tsf_twitter_card_type':
-					if ( ! \in_array( $value, Meta\Twitter::get_supported_cards(), true ) )
-						$value = ''; // default
 					break;
 
 				default:

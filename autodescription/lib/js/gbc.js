@@ -11,7 +11,7 @@
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -59,7 +59,7 @@ window.tsfGBC = function( $ ) {
 	 * @access private
 	 *
 	 * @param {String} attribute
-	 * @return {mixed|null}
+	 * @return {?mixed}
 	 */
 	function getPostAttribute( attribute ) {
 		return editor.getEditedPostAttribute( attribute );
@@ -71,19 +71,21 @@ window.tsfGBC = function( $ ) {
 	 * @since 3.2.0
 	 * @since 3.2.2 Now sets post visibility.
 	 * @since 5.0.3 Renamed from `setData()`.
-	 * @since 5.1.0 Now sets the 'slug', 'parent', 'date', and 'author'.
+	 * @since 5.1.0 Now also sets the 'slug', 'parent', 'date', and 'author'.
 	 * @access private
 	 */
 	function updateData() {
-		postData.set( 'title', getPostAttribute( 'title' ) )
-				.set( 'link', editor.getPermalink() )
-				.set( 'slug', getPostAttribute( 'slug' ) )
-				.set( 'parent', getPostAttribute( 'parent' ) )
-				.set( 'date', getPostAttribute( 'date' ) )
-				.set( 'author', getPostAttribute( 'author' ) )
-				.set( 'content', getPostAttribute( 'content' ) )
-				.set( 'excerpt', getPostAttribute( 'excerpt' ) )
-				.set( 'visibility', editor.getEditedPostVisibility() );
+
+		postData
+			.set( 'title', getPostAttribute( 'title' ) )
+			.set( 'link', editor.getPermalink() )
+			.set( 'slug', getPostAttribute( 'slug' ) )
+			.set( 'parent', getPostAttribute( 'parent' ) )
+			.set( 'date', getPostAttribute( 'date' ) )
+			.set( 'author', getPostAttribute( 'author' ) )
+			.set( 'content', getPostAttribute( 'content' ) )
+			.set( 'excerpt', getPostAttribute( 'excerpt' ) )
+			.set( 'visibility', editor.getEditedPostVisibility() );
 	}
 
 	/**
@@ -109,7 +111,7 @@ window.tsfGBC = function( $ ) {
 	 * Maintains asynchronous save states.
 	 * @since 3.2.0
 	 * @access private
-	 * @type {boolean} saved
+	 * @type {Boolean} saved
 	 */
 	let saved = false;
 	/**
@@ -128,6 +130,7 @@ window.tsfGBC = function( $ ) {
 	 * @access private
 	 */
 	function saveDispatcher() {
+
 		if ( ! saved ) {
 			if ( editor.isSavingPost() ) {
 				if ( editor.isPreviewingPost() ) {
@@ -180,6 +183,7 @@ window.tsfGBC = function( $ ) {
 	 * @access private
 	 */
 	function dispatchSavedEvent() {
+
 		if ( editor.isPostSavingLocked() ) {
 			// Retry again
 			if ( ++retryDispatch < 3 ) {
@@ -208,8 +212,8 @@ window.tsfGBC = function( $ ) {
 			}
 
 			if ( triggerOnSaveEvent ) {
-				document.dispatchEvent( new CustomEvent( 'tsf-gutenberg-onsave' ) )
-					&& document.dispatchEvent( new CustomEvent( 'tsf-gutenberg-onsave-completed' ) );
+				document.dispatchEvent( new CustomEvent( 'tsf-gutenberg-onsave' ) );
+				document.dispatchEvent( new CustomEvent( 'tsf-gutenberg-onsave-completed' ) );
 			}
 
 			document.dispatchEvent(
@@ -241,6 +245,7 @@ window.tsfGBC = function( $ ) {
 	 * @access private
 	 */
 	function sidebarDispatcher() {
+
 		if ( editPost.isEditorSidebarOpened() ) {
 			if ( ! lastSidebarState.opened ) {
 				lastSidebarState.opened = true;
@@ -258,7 +263,7 @@ window.tsfGBC = function( $ ) {
 	 * Dispatches an event of a data type, also sends data of set type.
 	 *
 	 * @since 3.2.0
-	 * @since 5.1.0 Added a non-jQuery event alternatives: `tsf-uppdated-block-editor` and `tsf-uppdated-block-editor-${type}`.
+	 * @since 5.1.0 Added a non-jQuery event alternatives: `tsf-updated-block-editor` and `tsf-updated-block-editor-${type}`.
 	 * @access public
 	 *
 	 * @param {String} type
@@ -310,21 +315,24 @@ window.tsfGBC = function( $ ) {
 		document.dispatchEvent( new CustomEvent( 'tsf-subscribed-to-gutenberg' ) );
 	}
 
-	return Object.assign( {
-		/**
-		 * Initialises all aspects of the scripts.
-		 * You shouldn't call this.
-		 *
-		 * @since 4.0.0
-		 * @access protected
-		 *
-		 * @function
-		 */
-		load: () => {
-			document.body.addEventListener( 'tsf-onload', _initCompat );
+	return Object.assign(
+		{
+			/**
+			 * Initialises all aspects of the scripts.
+			 * You shouldn't call this.
+			 *
+			 * @since 4.0.0
+			 * @access protected
+			 *
+			 * @function
+			 */
+			load: () => {
+				document.body.addEventListener( 'tsf-onload', _initCompat );
+			},
 		},
-	}, {
-		triggerUpdate,
-	} );
+		{
+			triggerUpdate,
+		},
+	);
 }( jQuery );
 window.tsfGBC.load();

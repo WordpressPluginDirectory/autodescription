@@ -8,14 +8,14 @@ namespace The_SEO_Framework\Data\Plugin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Traits\Property_Refresher,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -36,6 +36,8 @@ use \The_SEO_Framework\{
  * @since 5.0.0
  * @access protected
  *         Use tsf()->data()->plugin()->setup() instead.
+ *
+ * @NOTE: All static:: calls within this class are intentional due to Property_Refresher trait.
  */
 class Setup {
 	use Property_Refresher;
@@ -79,7 +81,7 @@ class Setup {
 	 * @since 5.0.0 1. $key is now variadic. Additional variables allow you to dig deeper in the cache.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
 	 *
-	 * @param string ...$key Option name. Additional parameters will try get subvalues of the array.
+	 * @param string ...$key Option name. Additional parameters will try get sub-values of the array.
 	 *                       When empty, it'll return all options. You should use get_default_options() instead.
 	 * @return mixed The default option. Null if it's not registered.
 	 */
@@ -100,7 +102,7 @@ class Setup {
 	 * @since 5.0.0 1. $key is now variadic. Additional variables allow you to dig deeper in the cache.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
 	 *
-	 * @param string ...$key Option name. Additional parameters will try get subvalues of the array.
+	 * @param string ...$key Option name. Additional parameters will try get sub-values of the array.
 	 *                       When empty, it'll return all options. You should use get_warned_options() instead.
 	 * @return bool True if warning is registered. False otherwise.
 	 */
@@ -122,6 +124,10 @@ class Setup {
 	 * @since 4.0.0 `home_title_location` is now switched from right to left, or vice-versa.
 	 * @since 4.2.4 `max_image_preview` now defaults to `large`, from `standard`, matching WordPress's default.
 	 * @since 4.2.7 Added `auto_description_html_method`, defaults to `fast`.
+	 * @since 5.2.0 1. Added `fediverse_site`, `fediverse_site_url`, `fediverse_creator`, and `fediverse_creator_url`.
+	 *              2. Added `breadcrumb_archive` and `breadcrumb_taxonomy`.
+	 *              3. Added `knowledge_tiktok`.
+	 *              4. Added `edit_proposed_values`.
 	 *
 	 * @return array Default site options.
 	 */
@@ -134,7 +140,7 @@ class Setup {
 
 		$titleloc = \is_rtl() ? 'left' : 'right';
 
-		// phpcs:disable, WordPress.Arrays.MultipleStatementAlignment -- precision alignment OK.
+		// phpcs:disable WordPress.Arrays.MultipleStatementAlignment -- precision alignment OK.
 		/**
 		 * @since 2.2.7
 		 * @param array $options The default site options.
@@ -150,13 +156,19 @@ class Setup {
 				'alter_search_query_type'  => 'in_query', // Search query type.
 
 				// General. Layout.
-				'display_seo_bar_tables'  => 1, // SEO Bar post-list tables.
-				'display_seo_bar_metabox' => 0, // SEO Bar post SEO Settings.
-				'seo_bar_low_contrast'    => 0, // SEO Bar contrast display settings.
-				'seo_bar_symbols'         => 0, // SEO Bar symbol display settings.
+				'display_seo_bar_tables'   => 1, // SEO Bar post-list tables.
+				'display_seo_bar_metabox'  => 0, // SEO Bar post SEO Settings.
+				'seo_bar_low_contrast'     => 0, // SEO Bar contrast display settings.
+				'seo_bar_symbols'          => 0, // SEO Bar symbol display settings.
+
+				'display_list_edit_options' => 1, // Quick/bulk edit fields in tables.
+				'display_term_edit_options' => 1, // Term edit fields.
+				'display_user_edit_options' => 1, // User edit fields.
 
 				'display_pixel_counter'     => 1, // Pixel counter.
 				'display_character_counter' => 1, // Character counter.
+
+				'edit_proposed_values' => 1, // Edit generated values directly.
 
 				// General. Canonical.
 				'canonical_scheme' => 'automatic', // Canonical URL scheme.
@@ -171,7 +183,7 @@ class Setup {
 				// Title.
 				'site_title'          => '',        // Blog name.
 				'title_separator'     => 'hyphen',  // Title separator, radio selection.
-				'title_location'      => $titleloc, // Title separation location.
+				'title_location'      => $titleloc, // Title separation location. cspell:ignore titleloc
 				'title_rem_additions' => 0,         // Remove title additions.
 				'title_rem_prefixes'  => 0,         // Remove title prefixes from archives.
 				'title_strip_tags'    => 1,         // Apply 'strip tags' on titles.
@@ -272,6 +284,12 @@ class Setup {
 				'twitter_site'    => '', // Twitter business @username.
 				'twitter_creator' => '', // Twitter user @username.
 
+				// Fediverse.
+				'fediverse_site'         => '', // Fediverse @user@domain.
+				'fediverse_site_url'     => '', // Fediverse profile URL.
+				'fediverse_creator'      => '', // Fediverse author fallback @user@domain.
+				'fediverse_creator_url'  => '', // Fediverse author fallback profile URL.
+
 				// oEmbed.
 				'oembed_use_og_title'     => 0, // Use custom meta titles in oEmbeds.
 				'oembed_use_social_image' => 1, // Use social images in oEmbeds.
@@ -290,24 +308,28 @@ class Setup {
 				'multi_og_image' => 0, // Allow multiple images to be generated.
 
 				// Theme color settings.
-				'theme_color' => '', // Theme color metatag, default none.
+				'theme_color' => '', // Theme color meta tag, default none.
 
 				// Social FallBack images (fb = fallback)
 				'social_image_fb_url' => '', // Fallback image URL.
 				'social_image_fb_id'  => 0,  // Fallback image ID.
 
 				// Webmasters.
-				'google_verification' => '', // Google Verification Code.
-				'bing_verification'   => '', // Bing Verification Code.
-				'yandex_verification' => '', // Yandex Verification Code.
-				'baidu_verification'  => '', // Baidu Verification Code.
-				'pint_verification'   => '', // Pinterest Verification Code.
+				'google_verification'   => '', // Google Verification Code.
+				'bing_verification'     => '', // Bing Verification Code.
+				'yandex_verification'   => '', // Yandex Verification Code.
+				'baidu_verification'    => '', // Baidu Verification Code.
+				'pint_verification'     => '', // Pinterest Verification Code.
+				'facebook_verification' => '', // Facebook Verification Code.
 
 				// Schema.org.
-				'ld_json_enabled'        => 1, // LD+Json toggle for Schema.
-				'ld_json_searchbox'      => 1, // LD+Json Sitelinks Search Box.
-				'ld_json_breadcrumbs'    => 1, // LD+Json Breadcrumbs.
-				'knowledge_output'       => 1, // Default for outputting the Knowledge SEO.
+				'ld_json_enabled'           => 1, // LD+Json toggle for Schema.
+				'ld_json_searchbox'         => 1, // LD+Json Sitelinks Search Box.
+				'ld_json_breadcrumbs'       => 1, // LD+Json Breadcrumbs.
+				'breadcrumb_archive'        => [], // Post Type archive crumb support.
+				'breadcrumb_taxonomy'       => [], // Post Type taxonomy crumb.
+				'breadcrumb_use_meta_title' => 0, // Whether to consider meta titles for breadcrumbs.
+				'knowledge_output'          => 1, // Default for outputting the Knowledge SEO.
 
 				// Knowledge general <https://developers.google.com/structured-data/customize/contact-points> - This is extremely extended and valuable. Expect a premium version.
 				'knowledge_type'   => 'organization', // Organization or Person, dropdown.
@@ -327,14 +349,15 @@ class Setup {
 				'knowledge_youtube'    => '', // Youtube Account.
 				'knowledge_linkedin'   => '', // Linkedin Account.
 				'knowledge_pinterest'  => '', // Pinterest Account.
+				'knowledge_tiktok'     => '', // TikTok Account.
 				'knowledge_soundcloud' => '', // SoundCloud Account.
 				'knowledge_tumblr'     => '', // Tumblr Account.
 
 				// Sitemaps.
-				'sitemaps_output'         => 1,    // Output of sitemap.
+				'sitemaps_output'         => 1,   // Output of sitemap.
 				'sitemap_query_limit'     => 250, // Sitemap post limit.
-				'cache_sitemap'           => 1, // Sitemap transient cache.
-				'sitemap_cron_prerender'  => 0, // Sitemap cron-ping prerender.
+				'cache_sitemap'           => 1,   // Sitemap transient cache.
+				'sitemap_cron_prerender'  => 0,   // Sitemap cron-ping prerender.
 
 				'sitemaps_modified' => 1, // Add sitemap modified time.
 
@@ -353,7 +376,7 @@ class Setup {
 				'index_the_feed'   => 0, // Add backlink to the end of the feed.
 			],
 		);
-		// phpcs:enable, WordPress.Arrays.MultipleStatementAlignment
+		// phpcs:enable WordPress.Arrays.MultipleStatementAlignment
 	}
 
 	/**

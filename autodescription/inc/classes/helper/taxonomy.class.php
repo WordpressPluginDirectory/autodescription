@@ -8,16 +8,16 @@ namespace The_SEO_Framework\Helper;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
 	memo,
 	umemo,
 };
 
-use \The_SEO_Framework\Data;
+use The_SEO_Framework\Data;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -66,7 +66,7 @@ class Taxonomy {
 		} else {
 			// Then, test some() post types.
 			// Populate $disabled within loop, for the taxonomy might not have post types at all.
-			foreach ( static::get_post_types( $taxonomy ) as $type ) {
+			foreach ( self::get_post_types( $taxonomy ) as $type ) {
 				if ( Post_Type::is_supported( $type ) ) {
 					$disabled = false;
 					break;
@@ -90,15 +90,14 @@ class Taxonomy {
 	/**
 	 * Determines if the taxonomy supports The SEO Framework.
 	 *
-	 * Checks if at least one taxonomy objects post type supports The SEO Framework,
-	 * and whether the taxonomy is public and rewritable.
+	 * Checks that the taxonomy is viewable and that it is not disabled.
 	 *
 	 * @since 4.0.0
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `is_taxonomy_supported`.
 	 *
 	 * @param string $taxonomy Optional. The taxonomy name.
-	 * @return bool True if at least one post type in taxonomy isn't disabled.
+	 * @return bool True when the taxonomy is viewable and not disabled.
 	 */
 	public static function is_supported( $taxonomy = '' ) {
 
@@ -107,14 +106,16 @@ class Taxonomy {
 		/**
 		 * @since 3.1.0
 		 * @since 4.0.0 Now returns only returns false when all post types in the taxonomy aren't supported.
-		 * @param bool   $post_type Whether the post type is supported
-		 * @param string $post_type_evaluated The evaluated post type.
+		 * @param bool   $supported Whether the taxonomy is supported.
+		 * @param string $taxonomy  The taxonomy name.
 		 */
 		return (bool) \apply_filters(
 			'the_seo_framework_supported_taxonomy',
-			$taxonomy
-				&& ! static::is_disabled( $taxonomy )
-				&& \in_array( $taxonomy, static::get_all_public(), true ),
+			(
+				   $taxonomy
+				&& ! self::is_disabled( $taxonomy )
+				&& \in_array( $taxonomy, self::get_all_public(), true )
+			),
 			$taxonomy,
 		);
 	}
@@ -129,10 +130,12 @@ class Taxonomy {
 	 * @return string[] All supported taxonomies.
 	 */
 	public static function get_all_supported() {
-		return memo() ?? memo( array_values( array_filter(
-			static::get_all_public(),
-			[ static::class, 'is_supported' ],
-		) ) );
+		return memo() ?? memo( array_values(
+			array_filter(
+				self::get_all_public(),
+				[ self::class, 'is_supported' ],
+			),
+		) );
 	}
 
 	/**
@@ -143,6 +146,7 @@ class Taxonomy {
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `get_public_taxonomies`.
 	 *              3. Is now public.
+	 * @since 5.2.0 Now resets the index keys of the return value.
 	 *
 	 * @return string[] The taxonomies that are public.
 	 */
@@ -158,18 +162,22 @@ class Taxonomy {
 				 */
 				(array) \apply_filters(
 					'the_seo_framework_public_taxonomies',
-					array_filter(
-						array_unique( array_merge(
-							static::get_all_forced_supported(),
-							// array_values() because get_taxonomies() gives a sequential array.
-							array_values( \get_taxonomies( [
-								'public'   => true,
-								'_builtin' => false,
-							] ) )
-						) ),
-						'is_taxonomy_viewable',
-					)
-				)
+					array_values(
+						array_filter(
+							array_unique(
+								array_merge(
+									self::get_all_forced_supported(),
+									// array_values() because get_taxonomies() gives a sequential array.
+									array_values( \get_taxonomies( [
+										'public'   => true,
+										'_builtin' => false,
+									] ) ),
+								),
+							),
+							'is_taxonomy_viewable',
+						),
+					),
+				),
 			);
 	}
 
@@ -204,6 +212,7 @@ class Taxonomy {
 	 * @since 4.0.0
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `get_post_types_from_taxonomy`.
+	 * @since 5.2.0 Now resets the index keys of the return value.
 	 *
 	 * @param string $taxonomy Optional. The taxonomy to check. Defaults to current screen/query taxonomy.
 	 * @return array List of post types.
@@ -213,7 +222,7 @@ class Taxonomy {
 		$taxonomy = $taxonomy ?: Query::get_current_taxonomy();
 		$tax      = $taxonomy ? \get_taxonomy( $taxonomy ) : null;
 
-		return $tax->object_type ?? [];
+		return array_values( $tax->object_type ?? [] );
 	}
 
 	/**
@@ -254,7 +263,7 @@ class Taxonomy {
 	 *              3. The first parameter is now optional.
 	 *
 	 * @param string $taxonomy The taxonomy.
-	 * @param bool   $singular Whether to get the singlural or plural name.
+	 * @param bool   $singular Whether to get the singular or plural name.
 	 * @return string The Taxonomy Type name/label, if found.
 	 */
 	public static function get_label( $taxonomy = '', $singular = true ) {

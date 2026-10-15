@@ -8,7 +8,7 @@
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -39,7 +39,7 @@ window.tsfPost = function () {
 	 *
 	 * @since 4.0.0
 	 * @access public
-	 * @type {(Object<string,*>)|boolean|null} l10n Localized strings
+	 * @type {(Object<string,*>)|Boolean|null} l10n Localized strings
 	 */
 	const l10n = tsfPostL10n;
 
@@ -92,14 +92,18 @@ window.tsfPost = function () {
 				  navNames  = target.querySelectorAll( '.tsf-flex-nav-name' );
 
 			if ( innerWrap.clientWidth <= target.clientWidth ) {
-				if ( +( target.dataset.displayedNames || 1 ) ) return; // Names are displayed by default on-load. Ergo, 1 by default.
+				// Names are displayed by default on-load. Ergo, 1 by default.
+				if ( +( target.dataset.displayedNames || 1 ) ) return;
+
 				target.dataset.displayedNames = 1;
 				navNames.forEach( element => {
+
 					element.style.display = null;
 					tsfUI.fadeIn( element );
 				} );
 			} else {
 				if ( ! +( target.dataset.displayedNames || 1 ) ) return;
+
 				target.dataset.displayedNames = 0;
 				// Don't animate, we're overflowing--rectify that ASAP.
 				navNames.forEach( element => { element.style.display = 'none' } );
@@ -115,6 +119,7 @@ window.tsfPost = function () {
 					// Usually, this only happens once when the navNames are meant to be displayed (target width growing).
 					setTimeout(
 						() => {
+
 							cancelAnimationFrame( overflowAnimationFrame.get( target.id ) );
 							overflowAnimationFrame.set( target.id, requestAnimationFrame( () => calculateTextOverflow( target ) ) );
 						},
@@ -124,6 +129,7 @@ window.tsfPost = function () {
 			}
 		}
 		const prepareCalculateTextOverflow = event => {
+
 			const target = event.detail.target || wrapper;
 			if ( target )
 				overflowAnimationFrame.set( target.id, requestAnimationFrame( () => calculateTextOverflow( target ) ) );
@@ -155,6 +161,7 @@ window.tsfPost = function () {
 				let target = entry.target;
 				cancelAnimationFrame( resizeAnimationFrame[ target.id ] );
 				resizeAnimationFrame[ target.id ] = requestAnimationFrame( () => {
+
 					// No support for all major browsers yet. Neither for entry.contentRect.
 					// entry.dataset.boxSizeWidth ||= contentBoxSize.inlineSize;
 
@@ -181,6 +188,7 @@ window.tsfPost = function () {
 	 * @access private
 	 */
 	function _initTabs() {
+
 		tsfTabs.initStack(
 			'tsfSettings',
 			{
@@ -202,7 +210,7 @@ window.tsfPost = function () {
 	/**
 	 * Returns the visibility setting from the Classic editor, as WordPress's PHP would interpret it.
 	 * We could optimize this (it runs thrice in a row without a debouncer), but that's not for this function to fix.
-	 * If WordPress didn't have this bug, we needn't have done these lookups at all.
+	 * The password "0" is the only value stored as public while Password stays selected.
 	 *
 	 * @since 5.0.5
 	 * @access private
@@ -213,7 +221,7 @@ window.tsfPost = function () {
 
 		let visibility = [ ...document.getElementsByName( 'visibility' ) ].filter( e => e.checked )?.[0]?.value;
 
-		// If password type is selected, but no password is set (or a falsy one), then assume public. This is a bug in WP.
+		// Only "0" is public. PHP empty( '0' ) is true, so WordPress stores that post as public.
 		if ( 'password' === visibility ) {
 			const val = document.getElementById( 'post_password' )?.value;
 			if ( val?.length && '0' === val )
@@ -232,6 +240,7 @@ window.tsfPost = function () {
 	 * @param {callable} callback
 	 */
 	function _registerPostPrivacyListener( callback ) {
+
 		// Block Editor.
 		document.addEventListener( 'tsf-updated-block-editor-visibility', event => callback( event.detail.value ) );
 
@@ -284,6 +293,7 @@ window.tsfPost = function () {
 		 * @function
 		 */
 		const updateCanonicalPlaceholder = () => {
+
 			tsfCanonical.updateStateOf(
 				_canonicalId,
 				'showUrlPlaceholder',
@@ -298,7 +308,7 @@ window.tsfPost = function () {
 			);
 		}
 
-		if ( tsfCanonical.usingPermalinks && canonicalInput ) {
+		if ( tsfCanonical.canTrackUrlStructure( _canonicalId ) && canonicalInput ) {
 			// We rewrote %pagename% to %postname% at `Meta\URI\Utils::get_url_permastruct()`.
 			const writePostname = tsfCanonical.structIncludes( _canonicalId, '%postname%' );
 			const writeDate     = tsfCanonical.structIncludes( _canonicalId, [ '%year%', '%monthnum%', '%day%', '%hour%', '%minute%', '%second%' ] );
@@ -342,6 +352,7 @@ window.tsfPost = function () {
 			 * @function
 			 */
 			const updateCanonical = () => {
+
 				if ( writePostname ) {
 					let activeSlug = '';
 
@@ -436,10 +447,11 @@ window.tsfPost = function () {
 			);
 
 			if ( Object.values( writeTerm ).includes( true ) ) {
-				// We're not debouncing this because the event is difficult to trigger in quick succession.
 				const updateParentTermSlugsViaPrimary = tsfUtils.debounce(
 					async event => {
+
 						const taxonomy = event.detail.taxonomy;
+
 						if ( writeTerm[ taxonomy ] ) {
 							termSlugs[ taxonomy ] = await tsfTermSlugs.get( event.detail.id, taxonomy );
 							queueUpdateCanonical();
@@ -461,9 +473,13 @@ window.tsfPost = function () {
 					const parentIdInput = document.getElementById( 'parent_id' );
 
 					const updatePostName = () => {
+
 						// Title isn't used directly, but may be used if the slug isn't set.
-						postTitle = titleInput?.value ?? ''
-						postSlug  = postNameInput?.value ?? document.getElementById( 'editable-post-name-full' )?.innerText ?? '';
+						postTitle = titleInput?.value ?? '';
+						postSlug  =
+							   postNameInput?.value
+							?? document.getElementById( 'editable-post-name-full' )?.innerText
+							?? '';
 						queueUpdateCanonical();
 					}
 					titleInput?.addEventListener( 'input', updatePostName );
@@ -474,6 +490,7 @@ window.tsfPost = function () {
 						// Observe these for changes. Otherwise, we'd have to rely on a multitude of jQuery callbacks affecting it.
 						new MutationObserver(
 							mutationList => {
+
 								for ( const mutation of mutationList ) {
 									// Look for the reintroduction of the "slug is edited" box.
 									if ( mutation.addedNodes.entries().some(
@@ -493,6 +510,7 @@ window.tsfPost = function () {
 					if ( parentIdInput ) {
 						const updateParentSlug = tsfUtils.debounce(
 							async () => {
+
 								parentSlugs = await tsfPostSlugs.get( parentIdInput.value );
 								queueUpdateCanonical();
 							},
@@ -504,12 +522,15 @@ window.tsfPost = function () {
 				}
 
 				if ( writeAuthor ) {
-					const authorIdInput = document.getElementById( 'post_author_override' ) ?? document.getElementById( 'post_author' );
+					const authorIdInput =
+						   document.getElementById( 'post_author_override' )
+						?? document.getElementById( 'post_author' );
 
 					if ( authorIdInput ) {
 						// We debounce the event listener since we're making AJAX requests.
 						const updateAuthor = tsfUtils.debounce(
 							async () => {
+
 								authorSlug = await tsfAuthorSlugs.get( authorIdInput.value );
 								queueUpdateCanonical();
 							},
@@ -534,6 +555,7 @@ window.tsfPost = function () {
 					const useDateFields = ! dateFields.some( v => v === null );
 
 					const getActiveDateValues = () => {
+
 						const values = dateFields.map( field => field.value );
 
 						// WordPress compensated for the 0-index month, we need to revert that.
@@ -544,6 +566,7 @@ window.tsfPost = function () {
 					}
 
 					const updateDateString = () => {
+
 						dateString = useDateFields
 							? new Date( ...getActiveDateValues() ).toISOString()
 							: state.publishDate;
@@ -568,6 +591,7 @@ window.tsfPost = function () {
 			 * @param {string} visibility
 			 */
 			const setRobotsDefaultIndexingState = visibility => {
+
 				let _defaultIndexOption = noindexSelect.querySelector( '[value="0"]' ),
 					indexDefaultValue   = '';
 
@@ -586,10 +610,7 @@ window.tsfPost = function () {
 				}
 
 				if ( _defaultIndexOption )
-					_defaultIndexOption.innerHTML = noindexSelect.dataset.defaultI18n.replace(
-						'%s',
-						tsf.escapeString( tsf.decodeEntities( indexDefaultValue ) )
-					);
+					_defaultIndexOption.textContent = ( noindexSelect.dataset.defaultI18n || '' ).replace( '%s', indexDefaultValue ?? '' );
 
 				updateCanonicalPlaceholder();
 			}
@@ -610,6 +631,7 @@ window.tsfPost = function () {
 			 * @param {Number} value
 			 */
 			const setRobotsIndexingState = value => {
+
 				let type = '';
 
 				switch ( +value ) {
@@ -666,6 +688,7 @@ window.tsfPost = function () {
 		 * @param {Event} event
 		 */
 		const updateTitleAdditions = event => {
+
 			let addAdditions = ! event.target.checked;
 
 			if ( l10n.params.additionsForcedDisabled ) {
@@ -689,6 +712,7 @@ window.tsfPost = function () {
 		 * @param {string} visibility
 		 */
 		const setTitleVisibilityPrefix = visibility => {
+
 			let prefixValue = '';
 
 			switch ( visibility ) {
@@ -723,6 +747,7 @@ window.tsfPost = function () {
 		 * @param {string} value
 		 */
 		const updateDefaultTitle = val => {
+
 			val = val?.trim() || '';
 
 			tsfTitle.updateStateOf(
@@ -741,7 +766,7 @@ window.tsfPost = function () {
 
 			document.addEventListener(
 				'tsf-updated-block-editor-title',
-				event => updateDefaultTitle( event.detail.value )
+				event => updateDefaultTitle( event.detail.value ),
 			);
 		}
 
@@ -778,6 +803,7 @@ window.tsfPost = function () {
 		 * @param {string} visibility
 		 */
 		const setDescriptionVisibility = visibility => {
+
 			let oldUseDefaultDescription = tsfDescription.getStateOf( _descId, 'useDefaultDescription' ),
 				useDefaultDescription    = true;
 
@@ -854,6 +880,7 @@ window.tsfPost = function () {
 	function _initGeneralListeners() {
 
 		const enqueueGeneralInputListeners = () => {
+
 			tsfTitle.enqueueUnregisteredInputTrigger( _titleId );
 			tsfDescription.enqueueUnregisteredInputTrigger( _descId );
 		}
@@ -867,6 +894,7 @@ window.tsfPost = function () {
 	 * Updates the SEO Bar and meta description placeholders on successful save.
 	 *
 	 * @since 4.0.0
+	 * @since 5.2.0 Now passes the social image URL placeholder to `tsfPropose.syncProposed()`.
 	 * @access private
 	 */
 	function _initUpdateMetaBox() {
@@ -883,6 +911,8 @@ window.tsfPost = function () {
 		const _ogDescription = tsfSocial.getInputInstance( _socialGroup )?.inputs?.ogDesc;
 		const _twDescription = tsfSocial.getInputInstance( _socialGroup )?.inputs?.twDesc;
 
+		// wp.ajax.send runs these through jQuery.param, so false is posted as the string "false".
+		// get_post_data() must filter with wp_validate_boolean, because array_filter() keeps that string.
 		const getData = {
 			seobar:          !! seobar,
 			metadescription: !! document.getElementById( _descId ),
@@ -900,16 +930,22 @@ window.tsfPost = function () {
 
 			setTimeout(
 				() => {
+
 					tsfDescription.updateStateOf( _descId, 'defaultDescription', response.data.metadescription.trim() );
 
 					const socialDefaults = tsfSocial.getStateOf( _socialGroup, 'defaults' );
-					socialDefaults.ogDesc = response.data.ogdescription.trim();
-					socialDefaults.twDesc = response.data.twdescription.trim();
-					tsfSocial.updateStateOf( _socialGroup, 'defaults', socialDefaults );
+					tsfSocial.updateStateOf( _socialGroup, 'defaults', {
+						...socialDefaults,
+						ogDesc: response.data.ogdescription.trim(),
+						twDesc: response.data.twdescription.trim(),
+					} );
 
 					if ( imageUrl ) {
 						// Is this necessary? It's safer than assuming, though :)
 						imageUrl.placeholder = tsf.decodeEntities( response.data.imageurl );
+
+						window.tsfPropose?.syncProposed( imageUrl );
+
 						imageUrl.dispatchEvent( new Event( 'change' ) );
 						tsfTT.triggerReset();
 					}
@@ -923,6 +959,7 @@ window.tsfPost = function () {
 				seobar,
 				fadeTime,
 				() => {
+
 					seobarAjaxLoader && tsf.unsetAjaxLoader( seobarAjaxLoader, true );
 					seobar.innerHTML = response.data.seobar;
 
@@ -932,7 +969,7 @@ window.tsfPost = function () {
 						() => {
 							tsfTT.triggerReset();
 						}
-					)
+					);
 				},
 			);
 		};
@@ -944,6 +981,7 @@ window.tsfPost = function () {
 		document.addEventListener(
 			'tsf-gutenberg-onsave',
 			() => {
+
 				// Reset ajax loader, we only do that for the SEO Bar.
 				seobarAjaxLoader && tsf.resetAjaxLoader( seobarAjaxLoader );
 
@@ -973,6 +1011,7 @@ window.tsfPost = function () {
 	 * @access private
 	 */
 	function _loadSettings() {
+
 		// One is not reliant on the other; this way, if one crashes, the rest still works.
 		[
 			_initVisibilityListeners,
@@ -997,6 +1036,7 @@ window.tsfPost = function () {
 	 * @access private
 	 */
 	function _readySettings() {
+
 		// Initializes flex tab resize listeners.
 		_doFlexResizeListener();
 
@@ -1007,22 +1047,26 @@ window.tsfPost = function () {
 		_initUpdateMetaBox();
 	}
 
-	return Object.assign( {
-		/**
-		 * Initialises all aspects of the scripts.
-		 * You shouldn't call this.
-		 *
-		 * @since 4.0.0
-		 * @access protected
-		 *
-		 * @function
-		 */
-		load: () => {
-			document.body.addEventListener( 'tsf-onload', _loadSettings );
-			document.body.addEventListener( 'tsf-ready', _readySettings );
+	return Object.assign(
+		{
+			/**
+			 * Initialises all aspects of the scripts.
+			 * You shouldn't call this.
+			 *
+			 * @since 4.0.0
+			 * @access protected
+			 *
+			 * @function
+			 */
+			load: () => {
+
+				document.body.addEventListener( 'tsf-onload', _loadSettings );
+				document.body.addEventListener( 'tsf-ready', _readySettings );
+			},
 		},
-	}, {
-		l10n,
-	} );
+		{
+			l10n,
+		},
+	);
 }();
 window.tsfPost.load();

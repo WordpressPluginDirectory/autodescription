@@ -8,12 +8,13 @@ namespace The_SEO_Framework\Meta\Title;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
+	get_query_type_from_args,
 	memo,
 	normalize_generation_args,
 };
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Helper\Query,
 	Meta,
@@ -21,7 +22,7 @@ use \The_SEO_Framework\{
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -50,8 +51,8 @@ class Conditions {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param array|null $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                         Leave null to autodetermine query.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine query.
 	 * @return bool True when prefixes are allowed.
 	 */
 	public static function use_protection_status( $args = null ) {
@@ -59,12 +60,13 @@ class Conditions {
 		if ( isset( $args ) ) {
 			normalize_generation_args( $args );
 
-			if ( empty( $args['id'] ) || $args['tax'] || $args['pta'] || $args['uid'] )
+			if ( 'single' !== get_query_type_from_args( $args ) )
 				return false;
 
 			$id = $args['id'];
 		} else {
-			if ( ! Query::is_singular() ) return false;
+			if ( ! Query::is_singular() )
+				return false;
 
 			$id = Query::get_the_real_id();
 		}
@@ -82,8 +84,8 @@ class Conditions {
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `use_title_pagination`.
 	 *
-	 * @param array|null $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                         Leave null to autodetermine query.
+	 * @param ?array $args The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                     Leave null to autodetermine query.
 	 * @return bool True when additions are allowed.
 	 */
 	public static function use_pagination( $args = null ) {
@@ -106,9 +108,10 @@ class Conditions {
 	 * @since 4.2.0 Now supports the `$args['pta']` index.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `use_title_branding`.
+	 * @since 5.2.0 Now removes the site title on author archives when that user meta is set.
 	 *
-	 * @param array|null  $args  The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                           Leave null to autodetermine query.
+	 * @param ?array      $args   The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                            Leave null to autodetermine query.
 	 * @param bool|string $social Whether the title is meant for social display.
 	 *                            Also accepts string 'og' and 'twitter' for future proofing.
 	 * @return bool True when additions are allowed.
@@ -123,24 +126,37 @@ class Conditions {
 			if ( isset( $args ) ) {
 				normalize_generation_args( $args );
 
-				if ( $args['tax'] ) {
-					$use = static::use_term_branding( $args['id'] );
-				} elseif ( $args['pta'] ) {
-					$use = static::use_pta_branding( $args['pta'] );
-				} elseif ( empty( $args['uid'] ) && Query::is_real_front_page_by_id( $args['id'] ) ) {
-					$use = static::use_front_page_tagline();
-				} else {
-					$use = static::use_post_branding( $args['id'] );
+				switch ( get_query_type_from_args( $args ) ) {
+					case 'single':
+						if ( Query::is_static_front_page( $args['id'] ) ) {
+							$use = self::use_front_page_tagline();
+						} else {
+							$use = self::use_post_branding( $args['id'] );
+						}
+						break;
+					case 'term':
+						$use = self::use_term_branding( $args['id'] );
+						break;
+					case 'homeblog':
+						$use = self::use_front_page_tagline();
+						break;
+					case 'pta':
+						$use = self::use_pta_branding( $args['pta'] );
+						break;
+					case 'user':
+						$use = self::use_user_branding( $args['uid'] );
 				}
 			} else {
 				if ( Query::is_real_front_page() ) {
-					$use = static::use_front_page_tagline();
+					$use = self::use_front_page_tagline();
 				} elseif ( Query::is_singular() ) {
-					$use = static::use_post_branding();
+					$use = self::use_post_branding();
 				} elseif ( Query::is_editable_term() ) {
-					$use = static::use_term_branding();
+					$use = self::use_term_branding();
 				} elseif ( \is_post_type_archive() ) {
-					$use = static::use_pta_branding();
+					$use = self::use_pta_branding();
+				} elseif ( Query::is_author() ) {
+					$use = self::use_user_branding();
 				} else {
 					$use = ! Data\Plugin::get_option( 'title_rem_additions' );
 				}
@@ -150,10 +166,10 @@ class Conditions {
 		/**
 		 * @since 3.1.2
 		 * @since 4.1.0 Added the third $social parameter.
-		 * @param bool       $use    Whether to use branding.
-		 * @param array|null $args   The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
-		 *                           Is null when the query is auto-determined.
-		 * @param bool       $social Whether the title is meant for social display.
+		 * @param bool   $use    Whether to use branding.
+		 * @param ?array $args   The query arguments. Contains 'id', 'tax', 'pta', and 'uid'.
+		 *                       Is null when the query is auto-determined.
+		 * @param bool   $social Whether the title is meant for social display.
 		 */
 		return \apply_filters(
 			'the_seo_framework_use_title_branding',
@@ -219,26 +235,39 @@ class Conditions {
 	}
 
 	/**
+	 * Determines whether to add the title tagline for the author archive.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param int $user_id The user ID. Optional. Leave 0 to use the queried author.
+	 * @return bool
+	 */
+	private static function use_user_branding( $user_id = 0 ) {
+		return ! Data\Plugin\User::get_current_post_author_meta_item( 'title_no_blog_name', $user_id )
+			&& ! Data\Plugin::get_option( 'title_rem_additions' );
+	}
+
+	/**
 	 * Determines whether to use the autogenerated archive title prefix or not.
 	 *
 	 * @since 3.1.0
-	 * @since 4.0.5 1: Added first parameter `$term`.
+	 * @since 4.0.5 1: Added first parameter `$object`.
 	 *              2: Added filter.
 	 * @since 5.0.0 Moved from `\The_SEO_Framework\Load`.
 	 *
-	 * @param \WP_Term|\WP_User|\WP_Post_Type|null $term The Term object. Leave null to autodermine query.
+	 * @param \WP_Term|\WP_User|\WP_Post_Type|null $object The Term object. Leave null to autodetermine object.
 	 * @return bool
 	 */
-	public static function use_generated_archive_prefix( $term = null ) {
+	public static function use_generated_archive_prefix( $object = null ) {
 		/**
 		 * @since 4.0.5
 		 * @param bool                            $use  Whether to use the prefix.
-		 * @param \WP_Term|\WP_User|\WP_Post_Type $term The current term object.
+		 * @param \WP_Term|\WP_User|\WP_Post_Type $object The current archive object.
 		 */
 		return \apply_filters(
 			'the_seo_framework_use_archive_prefix',
 			! Data\Plugin::get_option( 'title_rem_prefixes' ),
-			$term ?? \get_queried_object(),
+			$object ?? \get_queried_object(),
 		);
 	}
 }

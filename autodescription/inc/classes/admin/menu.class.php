@@ -7,7 +7,7 @@ namespace The_SEO_Framework\Admin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
 	memo,
 	has_run,
 	is_headless,
@@ -15,7 +15,7 @@ use function \The_SEO_Framework\{
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -40,8 +40,9 @@ use function \The_SEO_Framework\{
 class Menu {
 
 	/**
-	 * Adds menu links under "settings" in the wp-admin dashboard
+	 * Adds the top-level SEO menu in wp-admin.
 	 *
+	 * @hook admin_menu 10
 	 * @since 2.2.2
 	 * @since 2.9.2 Added static cache so the method can only run once.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
@@ -53,7 +54,7 @@ class Menu {
 
 		if ( has_run( __METHOD__ ) ) return;
 
-		$menu = static::get_top_menu_args();
+		$menu = self::get_top_menu_args();
 
 		\add_menu_page(
 			$menu['page_title'],
@@ -84,8 +85,8 @@ class Menu {
 		 */
 		if ( \current_user_can( $menu['capability'] ) )
 			\add_action(
-				'load-' . static::get_page_hook_name(),
-				[ Settings\Plugin::class, 'register_seo_settings_meta_boxes' ]
+				'load-' . self::get_page_hook_name(),
+				[ Settings\Plugin::class, 'register_seo_settings_meta_boxes' ],
 			);
 	}
 
@@ -96,10 +97,11 @@ class Menu {
 	 */
 	public static function get_top_menu_args() {
 
-		// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition -- I know.
-		if ( null !== $memo = memo() ) return $memo;
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition -- I know.
+		if ( null !== $memo = memo() )
+			return $memo;
 
-		$issue_count = static::get_top_menu_issue_count();
+		$issue_count = self::get_top_menu_issue_count();
 
 		/**
 		 * @since 4.2.8
@@ -110,7 +112,7 @@ class Menu {
 			[
 				'page_title' => \esc_html__( 'SEO Settings', 'autodescription' ),
 				'menu_title' => \esc_html__( 'SEO', 'autodescription' )
-					. ( $issue_count ? static::get_issue_badge( $issue_count ) : '' ),
+					. ( $issue_count ? self::get_issue_badge( $issue_count ) : '' ),
 				'capability' => \THE_SEO_FRAMEWORK_SETTINGS_CAP,
 				'menu_slug'  => \THE_SEO_FRAMEWORK_SITE_OPTIONS_SLUG,
 				'callback'   => [ Settings\Plugin::class, 'prepare_settings_wrap' ],
@@ -133,12 +135,12 @@ class Menu {
 		if ( $submenu ) {
 			return $names[ $submenu ] ??= \get_plugin_page_hookname(
 				$submenu,
-				static::get_top_menu_args()['menu_slug'],
+				self::get_top_menu_args()['menu_slug'],
 			);
 		}
 
 		return $names[''] ??= \get_plugin_page_hookname(
-			static::get_top_menu_args()['menu_slug'],
+			self::get_top_menu_args()['menu_slug'],
 			'',
 		);
 	}
@@ -155,7 +157,8 @@ class Menu {
 	 */
 	public static function get_top_menu_issue_count() {
 
-		if ( is_headless( 'settings' ) ) return 0;
+		if ( is_headless( 'settings' ) )
+			return 0;
 
 		/**
 		 * @since 4.2.8
@@ -186,7 +189,7 @@ class Menu {
 				/* translators: %s: number of issues waiting */
 				\_n( '%s issue waiting', '%s issues waiting', $issue_count, 'autodescription' ),
 				$notice_i18n,
-			)
+			),
 		);
 	}
 }

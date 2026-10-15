@@ -8,20 +8,21 @@ namespace The_SEO_Framework\Admin\Settings;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Admin,
 	Admin\Settings\Layout\HTML,
 	Data,
-	Data\Filter\Sanitize,
-	Helper\Query,
-	Helper\Taxonomy,
-	Helper\Template,
 	Meta,
+};
+use The_SEO_Framework\Helper\{
+	Query,
+	Taxonomy,
+	Template,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -62,7 +63,28 @@ final class ListEdit extends Admin\Lists\Table {
 		$instance = new self;
 
 		\add_action( 'current_screen', [ $instance, 'prepare_edit_box' ] );
-		\add_filter( 'hidden_columns', [ $instance, 'hide_quick_edit_column' ], 10, 1 );
+		\add_filter( 'hidden_columns', [ $instance, 'hide_quick_edit_column' ] );
+	}
+
+	/**
+	 * Skips column setup on the users list.
+	 *
+	 * @hook current_screen 10
+	 * @since 5.2.0
+	 * @access private
+	 *
+	 * @param \WP_Screen $screen The current screen.
+	 */
+	public function prepare_columns( $screen ) {
+
+		// User screens don't have quick/bulk edit.
+		switch ( $screen->base ) {
+			case 'users':
+			case 'users-network':
+				return;
+		}
+
+		parent::prepare_columns( $screen );
 	}
 
 	/**
@@ -97,7 +119,9 @@ final class ListEdit extends Admin\Lists\Table {
 	 * @return array $columns the column data
 	 */
 	public function hide_quick_edit_column( $hidden ) {
+
 		$hidden[] = $this->column_name;
+
 		return $hidden;
 	}
 
@@ -106,7 +130,7 @@ final class ListEdit extends Admin\Lists\Table {
 	 * This column is a dummy, but it's required to display quick/bulk edit items.
 	 *
 	 * @hook manage_{$screen_id}_columns 10
-	 * @hook manage_edit-{$taxonomy}_columns 1
+	 * @hook manage_edit-{$taxonomy}_columns 10
 	 * @since 4.0.0
 	 * @since 5.0.0 Renamed from `_add_column`.
 	 * @abstract
@@ -115,8 +139,10 @@ final class ListEdit extends Admin\Lists\Table {
 	 * @return array $columns the column data
 	 */
 	public function add_column( $columns ) {
+
 		// Don't set a title, otherwise it's displayed in the screen settings.
 		$columns[ $this->column_name ] = '';
+
 		return $columns;
 	}
 
@@ -135,7 +161,7 @@ final class ListEdit extends Admin\Lists\Table {
 
 		if ( $this->column_name !== $column_name ) return;
 
-		// phpcs:ignore, Generic.CodeAnalysis.EmptyStatement -- For the future, when WordPress Core decides.
+		// phpcs:ignore Generic.CodeAnalysis.EmptyStatement -- For the future, when WordPress Core decides.
 		if ( $taxonomy ) {
 			// Not yet.
 		} else {
@@ -172,6 +198,7 @@ final class ListEdit extends Admin\Lists\Table {
 	 * @hook manage_pages_custom_column 1
 	 * @since 4.0.0
 	 * @since 5.0.0 Renamed from `_output_column_contents_for_post`.
+	 * @since 5.2.0 Now ignores password protection when building the Indexing default.
 	 * @abstract
 	 *
 	 * @param string $column_name The name of the column to display.
@@ -182,14 +209,16 @@ final class ListEdit extends Admin\Lists\Table {
 		if (
 			   $this->column_name !== $column_name
 			|| ! \current_user_can( 'edit_post', $post_id )
-		) return;
+		) {
+			return;
+		}
 
 		$generator_args = [ 'id' => $post_id ];
 
 		$r_defaults = Meta\Robots::get_generated_meta(
 			$generator_args,
 			[ 'noindex', 'nofollow', 'noarchive' ],
-			\The_SEO_Framework\ROBOTS_IGNORE_SETTINGS,
+			\The_SEO_Framework\ROBOTS_IGNORE_SETTINGS | \The_SEO_Framework\ROBOTS_IGNORE_PROTECTION,
 		);
 
 		$meta        = Data\Plugin\Post::get_meta( $post_id );
@@ -236,13 +265,18 @@ final class ListEdit extends Admin\Lists\Table {
 		 * @since 4.0.5
 		 * @since 4.1.0 Now has `doctitle` and `description` indexes in its first parameter.
 		 * @since 4.2.3 Now supports the `placeholder` index for $data.
+		 * @example $data `[ 'noindex' => [ 'value' => 0, 'isSelect' => true, 'default' => 'index' ] ]`
 		 * @param array $data           {
 		 *     The current data keyed by input field name.
 		 *
-		 *     @type mixed  $value       The current value.
-		 *     @type bool   $isSelect    Optional. Whether the field is a select field.
-		 *     @type string $default     Optional. Only works when $isSelect is true. The default value to be set in select index 0.
-		 *     @type string $placeholder Optional. Only works when $isSelect is false. Sets a placeholder for the input field.
+		 *     @type array {$field} {
+		 *         The input field data.
+		 *
+		 *         @type mixed  $value       The current value.
+		 *         @type bool   $isSelect    Optional. Whether the field is a select field.
+		 *         @type string $default     Optional. Only works when $isSelect is true. The default value to be set in select index 0.
+		 *         @type string $placeholder Optional. Only works when $isSelect is false. Sets a placeholder for the input field.
+		 *     }
 		 * }
 		 * @param array $generator_args The query data. Contains 'id' or 'taxonomy'.
 		 */
@@ -252,9 +286,11 @@ final class ListEdit extends Admin\Lists\Table {
 			// '<span class=hidden id=%s data-le="%s"></span>',
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeData[%s]', (int) $post_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
-			HTML::make_data_attributes( [ 'le' => $data ] )
+			// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			HTML::make_data_attributes( [ 'le' => $data ] ),
 		);
+
+		$primary_terms = [];
 
 		if ( $is_homepage ) {
 			// When the homepage title is set, we can safely get the custom field.
@@ -281,6 +317,8 @@ final class ListEdit extends Admin\Lists\Table {
 
 			$permastruct               = Meta\URI\Utils::get_url_permastruct( $generator_args );
 			$is_post_type_hierarchical = false; // Homepage cannot have a parent page.
+
+			$primary_terms = []; // Homepage cannot have terms -- at least... why would anyone.
 		} else {
 			static $memo = [];
 
@@ -298,7 +336,7 @@ final class ListEdit extends Admin\Lists\Table {
 			$is_canonical_ref_locked = false;
 			$default_canonical       = Meta\URI::get_generated_url( $generator_args );
 
-			$memo['post_type']                 ??= Query::get_admin_post_type();
+			$memo['post_type']                 ??= Query::get_post_type_real_id( $post_id );
 			$memo['permastruct']               ??= Meta\URI\Utils::get_url_permastruct( $generator_args );
 			$memo['is_post_type_hierarchical'] ??= \is_post_type_hierarchical( $memo['post_type'] );
 
@@ -321,25 +359,30 @@ final class ListEdit extends Admin\Lists\Table {
 			}
 
 			// Only hierarchical taxonomies can be used in the URL.
-			// TODO filter post_tag here.
-			$memo['taxonomies'] ??= $post_type ? Taxonomy::get_hierarchical( 'names', $post_type ) : [];
+			$memo['taxonomies'] ??= array_diff(
+				$post_type ? Taxonomy::get_hierarchical( 'names', $post_type ) : [],
+				// post_tag isn't hierarchical by default, but it can be filtered to be.
+				// It's broken in Core when used in the permastruct. Nobody should be using %post_tag%.
+				[ 'post_tag' ],
+			);
 
 			$taxonomies               = $memo['taxonomies'];
 			$parent_term_slugs_by_tax = [];
+			$primary_term_ids         = [];
+
+			// Store primary term IDs for later use.
+			foreach ( $taxonomies as $taxonomy )
+				$primary_term_ids[ $taxonomy ] = Data\Plugin\Post::get_primary_term_id( $post_id, $taxonomy );
 
 			// Yes, on its surface, this is a very expensive procedure.
 			// However, WordPress needs to walk all the terms already to create the post links.
 			// Hence, it ought to net to zero impact.
 			foreach ( $taxonomies as $taxonomy ) {
 				if ( str_contains( $permastruct, "%$taxonomy%" ) ) {
-					// Broken in Core. Skip writing cache. We may reach this line 200 times, but nobody should be using %post_tag% anyway.
-					if ( 'post_tag' === $taxonomy ) continue;
-
-					$parent_term_slugs_by_tax[ $taxonomy ] = [];
 					// There's no need to test for hierarchy, because we want the full structure anyway (third parameter).
 					foreach (
 						Data\Term::get_term_parents(
-							Data\Plugin\Post::get_primary_term_id( $post_id, $taxonomy ),
+							$primary_term_ids[ $taxonomy ],
 							$taxonomy,
 							true,
 						)
@@ -367,24 +410,34 @@ final class ListEdit extends Admin\Lists\Table {
 					];
 				}
 			}
+
+			foreach ( $taxonomies as $taxonomy ) {
+				$primary_terms[ "primary_term_{$taxonomy}" ] = [
+					'value'    => $primary_term_ids[ $taxonomy ] ?? 0,
+					'isSelect' => true,
+					'taxonomy' => $taxonomy,
+				];
+			}
 		}
 
 		printf(
 			// '<span class=hidden id=%s data-le-post-data="%s"></span>',
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLePostData[%s]', (int) $post_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:disable WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'lePostData' => [
-					'isFront' => Query::is_static_front_page( $generator_args['id'] ),
+					'isFront'      => Query::is_static_front_page( $generator_args['id'] ),
+					'primaryTerms' => $primary_terms,
 				],
 			] ),
+			// phpcs:enable WordPress.Security.EscapeOutput
 		);
 		printf(
 			// '<span class=hidden id=%s data-le-title="%s"></span>',
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeTitleData[%s]', (int) $post_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:disable WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leTitle' => [
 					'refTitleLocked'    => $is_title_ref_locked,
@@ -394,24 +447,26 @@ final class ListEdit extends Admin\Lists\Table {
 					'additionPlacement' => 'left' === $seplocation ? 'before' : 'after',
 				],
 			] ),
+			// phpcs:enable WordPress.Security.EscapeOutput
 		);
 		printf(
 			// '<span class=hidden id=%s data-le-description="%s"></span>',
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeDescriptionData[%s]', (int) $post_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:disable WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leDescription' => [
 					'refDescriptionLocked' => $is_desc_ref_locked,
 					'defaultDescription'   => $default_description,
 				],
 			] ),
+			// phpcs:enable WordPress.Security.EscapeOutput
 		);
 		printf(
 			// '<span class=hidden id=%s data-le-canonical="%s"></span>',
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeCanonicalData[%s]', (int) $post_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:disable WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leCanonical' => [
 					'refCanonicalLocked'  => $is_canonical_ref_locked,
@@ -423,14 +478,15 @@ final class ListEdit extends Admin\Lists\Table {
 					'supportedTaxonomies' => $taxonomies ?? [],
 					'authorSlugs'         => $author_slugs ?? [],
 					'isHierarchical'      => $is_post_type_hierarchical,
-					// phpcs:ignore, WordPress.DateTime.RestrictedFunctions -- date() is used for URL generation. See `get_permalink()`.
+					// phpcs:ignore WordPress.DateTime.RestrictedFunctions -- date() is used for URL generation. See `get_permalink()`.
 					'publishDate'         => date( 'c', strtotime( \get_post( $post_id )->post_date ?? 'now' ) ),
 				],
 			] ),
+			// phpcs:enable WordPress.Security.EscapeOutput
 		);
 
 		if ( $this->doing_ajax )
-			echo $this->get_ajax_dispatch_updated_event(); // phpcs:ignore, WordPress.Security.EscapeOutput
+			echo $this->get_ajax_dispatch_updated_event(); // phpcs:ignore WordPress.Security.EscapeOutput
 	}
 
 	/**
@@ -452,8 +508,11 @@ final class ListEdit extends Admin\Lists\Table {
 	 */
 	public function output_column_contents_for_term( $string, $column_name, $term_id ) {
 
-		if ( $this->column_name !== $column_name )          return $string;
-		if ( ! \current_user_can( 'edit_term', $term_id ) ) return $string;
+		if ( $this->column_name !== $column_name )
+			return $string;
+
+		if ( ! \current_user_can( 'edit_term', $term_id ) )
+			return $string;
 
 		$taxonomy = $this->taxonomy;
 
@@ -508,13 +567,18 @@ final class ListEdit extends Admin\Lists\Table {
 		 * @since 4.0.5
 		 * @since 4.1.0 Now has `doctitle` and `description` indexes in its first parameter.
 		 * @since 4.2.3 Now supports the `placeholder` index for $data.
+		 * @example $data `[ 'noindex' => [ 'value' => 0, 'isSelect' => true, 'default' => 'index' ] ]`
 		 * @param array $data           {
 		 *     The current data keyed by input field name.
 		 *
-		 *     @type mixed  $value       The current value.
-		 *     @type bool   $isSelect    Optional. Whether the field is a select field.
-		 *     @type string $default     Optional. Only works when $isSelect is true. The default value to be set in select index 0.
-		 *     @type string $placeholder Optional. Only works when $isSelect is false. Sets a placeholder for the input field.
+		 *     @type array {$field} {
+		 *         The input field data.
+		 *
+		 *         @type mixed  $value       The current value.
+		 *         @type bool   $isSelect    Optional. Whether the field is a select field.
+		 *         @type string $default     Optional. Only works when $isSelect is true. The default value to be set in select index 0.
+		 *         @type string $placeholder Optional. Only works when $isSelect is false. Sets a placeholder for the input field.
+		 *     }
 		 * }
 		 * @param array $generator_args The query data. Contains 'id' and 'tax'.
 		 */
@@ -530,7 +594,7 @@ final class ListEdit extends Admin\Lists\Table {
 
 		$memo['tax_object']               ??= \get_taxonomy( $taxonomy );
 		$memo['permastruct']              ??= Meta\URI\Utils::get_url_permastruct( $generator_args );
-		$memo['is_taxonomy_hierarchical'] ??= $memo['tax_object']->hierarchical && $memo['tax_object']->rewrite['hierarchical'];
+		$memo['is_taxonomy_hierarchical'] ??= $memo['tax_object']->hierarchical && ( $memo['tax_object']->rewrite['hierarchical'] ?? false );
 
 		$permastruct = $memo['permastruct'];
 
@@ -553,8 +617,8 @@ final class ListEdit extends Admin\Lists\Table {
 		$container .= \sprintf(
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeData[%s]', (int) $term_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
-			HTML::make_data_attributes( [ 'le' => $data ] )
+			// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			HTML::make_data_attributes( [ 'le' => $data ] ),
 		);
 
 		$term_prefix = Meta\Title\Conditions::use_generated_archive_prefix( \get_term( $generator_args['id'], $generator_args['tax'] ) )
@@ -568,7 +632,7 @@ final class ListEdit extends Admin\Lists\Table {
 		$container .= \sprintf(
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeTitleData[%s]', (int) $term_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leTitle' => [
 					'refTitleLocked'    => false,
@@ -583,7 +647,7 @@ final class ListEdit extends Admin\Lists\Table {
 		$container .= \sprintf(
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeDescriptionData[%s]', (int) $term_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leDescription' => [
 					'refDescriptionLocked' => false,
@@ -594,7 +658,7 @@ final class ListEdit extends Admin\Lists\Table {
 		$container .= \sprintf(
 			'<span class=hidden id=%s %s></span>',
 			\sprintf( 'tsfLeCanonicalData[%s]', (int) $term_id ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput -- make_data_attributes escapes.
+			// phpcs:ignore WordPress.Security.EscapeOutput -- make_data_attributes escapes.
 			HTML::make_data_attributes( [
 				'leCanonical' => [
 					'refCanonicalLocked' => false,

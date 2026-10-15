@@ -10,7 +10,7 @@ namespace The_SEO_Framework\Front\Meta\Generator;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2025 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -35,7 +35,7 @@ final class Advanced_Query_Protection {
 
 	/**
 	 * @since 5.0.0
-	 * @var callable[] GENERATORS A list of autoloaded meta callbacks.
+	 * @var callable[] GENERATORS A list of auto-loaded meta callbacks.
 	 */
 	public const GENERATORS = [
 		[ __CLASS__, 'generate_advanced_query_protection' ],

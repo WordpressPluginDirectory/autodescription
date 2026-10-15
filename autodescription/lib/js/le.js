@@ -8,7 +8,7 @@
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2019 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2019 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -40,9 +40,9 @@ window.tsfLe = function () {
 	 * @property {Object} doctitle    - {value: string}
 	 * @property {Object} description - {value: string}
 	 * @property {Object} canonical   - {value: string}
-	 * @property {Object} noindex     - {value: number, isSelect: boolean, default: string}
-	 * @property {Object} nofollow    - {value: number, isSelect: boolean, default: string}
-	 * @property {Object} noarchive   - {value: number, isSelect: boolean, default: string}
+	 * @property {Object} noindex     - {value: number, isSelect: Boolean, default: string}
+	 * @property {Object} nofollow    - {value: number, isSelect: Boolean, default: string}
+	 * @property {Object} noarchive   - {value: number, isSelect: Boolean, default: string}
 	 * @property {Object} redirect    - {value: string, placeholder: string}
 	 */
 	let fieldsData;
@@ -50,7 +50,8 @@ window.tsfLe = function () {
 	/**
 	 * The current default post data obtained via tsfLePostData.
 	 * @typedef {?Object} postData
-	 * @property {Boolean} isFront
+	 * @property {Boolean}                isFront
+	 * @property {Object<string, Object>} primaryTerms
 	 */
 	let postData;
 
@@ -89,9 +90,11 @@ window.tsfLe = function () {
 	 * Sets inline post values for quick-edit.
 	 *
 	 * @since 4.0.0
+	 * @since 5.2.0 Now passes the placeholder to `tsfPropose.syncProposed()`.
 	 * @access private
 	 */
 	function _setInlinePostValues() {
+
 		for ( const option in fieldsData ) {
 			const params  = fieldsData[ option ];
 			const element = document.getElementById( 'autodescription-quick[%s]'.replace( '%s', option ) );
@@ -104,12 +107,15 @@ window.tsfLe = function () {
 				// Do `sprintf( 'Default (%s)', params.default )`.
 				const _default = element.querySelector( '[value="0"]' );
 				if ( _default )
-					_default.innerHTML = _default.innerHTML.replace( '%s', tsf.escapeString( tsf.decodeEntities( params.default ) ) );
+					_default.textContent = ( _default.textContent || '' ).replace( '%s', params.default ?? '' );
 			} else {
 				element.value = tsf.decodeEntities( params.value );
 
-				if ( params.placeholder?.length )
+				if ( params.placeholder?.length ) {
 					element.placeholder = tsf.decodeEntities( params.placeholder );
+
+					window.tsfPropose?.syncProposed( element );
+				}
 			}
 		}
 	}
@@ -212,6 +218,7 @@ window.tsfLe = function () {
 			 * @function
 			 */
 			const setTitleVisibilityPrefix = () => {
+
 				let prefixValue = '';
 
 				switch ( _getPostVisibility( id ) ) {
@@ -243,6 +250,7 @@ window.tsfLe = function () {
 		 * @param {Event} event
 		 */
 		const setDefaultTitle = event => {
+
 			const target     = ( event.originalEvent || event ).target,
 				  inputTitle = target.value?.trim() || '';
 
@@ -370,6 +378,7 @@ window.tsfLe = function () {
 		 * @function
 		 */
 		const updateCanonicalPlaceholder = () => {
+
 			tsfCanonical.updateStateOf(
 				canonicalId,
 				'showUrlPlaceholder',
@@ -388,7 +397,7 @@ window.tsfLe = function () {
 		const inlineEditWrap = document.getElementById( `edit-${id}` );
 
 		// The wrap should always exist, but since we didn't create it, we test for it.
-		if ( tsfCanonical.usingPermalinks && canonicalInput && inlineEditWrap ) switch ( _editType ) {
+		if ( tsfCanonical.canTrackUrlStructure( canonicalId ) && canonicalInput && inlineEditWrap ) switch ( _editType ) {
 			case 'post': { // rescope for there's reused block-scoped variables with 'tax'.
 				// We rewrote %pagename% to %postname% at `Meta\URI\Utils::get_url_permastruct()`.
 				const writePostname = tsfCanonical.structIncludes( canonicalId, '%postname%' );
@@ -432,6 +441,7 @@ window.tsfLe = function () {
 				 * @function
 				 */
 				const updateCanonical = () => {
+
 					if ( writePostname ) {
 						let activeSlug = '';
 
@@ -486,27 +496,29 @@ window.tsfLe = function () {
 				}
 				const queueUpdateCanonical = tsfUtils.debounce( updateCanonical, 1000/60 ); // 60 fps.
 
-				// TODO 5.1.x
-				// if ( Object.values( writeTerm ).includes( true ) ) {
-				// 	// We're not debouncing this because the event is difficult to trigger in quick succession.
-				// 	const updateParentTermSlugsViaPrimary = tsfUtils.debounce(
-				// 		async event => {
-				// 			const taxonomy = event.detail.taxonomy;
-				// 			if ( writeTerm[ taxonomy ] ) {
-				// 				termSlugs[ taxonomy ] = await tsfTermSlugs.get( event.detail.id, taxonomy );
-				// 				queueUpdateCanonical();
-				// 			}
-				// 		},
-				// 		100, // Magic number. High enough to prevent self-DoS, low enough to be responsive.
-				// 	);
-				// 	document.addEventListener( `tsf-updated-primary-term`, updateParentTermSlugsViaPrimary );
-				// }
+				if ( Object.values( writeTerm ).includes( true ) ) {
+					const updateParentTermSlugsViaPrimary = tsfUtils.debounce(
+						async event => {
+
+							const taxonomy = event.detail.taxonomy;
+
+							if ( writeTerm[ taxonomy ] ) {
+								termSlugs[ taxonomy ] = await tsfTermSlugs.get( event.detail.id, taxonomy );
+								queueUpdateCanonical();
+							}
+						},
+						100, // Magic number. High enough to prevent self-DoS, low enough to be responsive.
+					);
+					document.addEventListener( `tsf-updated-primary-term`, updateParentTermSlugsViaPrimary );
+				}
+
 				if ( writePostname ) {
 					const postNameInput = inlineEditWrap.querySelector( '[name=post_name]' );
 					const titleInput    = inlineEditWrap.querySelector( '[name=post_title]' );
 					const parentIdInput = inlineEditWrap.querySelector( '[name=post_parent]' );
 
 					const updatePostName = () => {
+
 						// Title isn't used directly, but may be used if the slug isn't set.
 						postTitle = titleInput?.value ?? ''
 						postSlug  = postNameInput?.value ?? '';
@@ -519,6 +531,7 @@ window.tsfLe = function () {
 					if ( parentIdInput ) {
 						const updateParentSlug = tsfUtils.debounce(
 							async () => {
+
 								parentSlugs = await tsfPostSlugs.get( parentIdInput.value );
 								queueUpdateCanonical();
 							},
@@ -536,6 +549,7 @@ window.tsfLe = function () {
 						// We debounce the event listener since we're making AJAX requests.
 						const updateAuthor = tsfUtils.debounce(
 							async () => {
+
 								authorSlug = await tsfAuthorSlugs.get( authorIdInput.value );
 								queueUpdateCanonical();
 							},
@@ -558,6 +572,7 @@ window.tsfLe = function () {
 					const useDateFields = ! dateFields.some( v => v === null );
 
 					const getActiveDateValues = () => {
+
 						const values = dateFields.map( field => field.value );
 
 						// WordPress compensated for the 0-index month, we need to revert that.
@@ -568,6 +583,7 @@ window.tsfLe = function () {
 					}
 
 					const updateDateString = () => {
+
 						dateString = useDateFields
 							? new Date( ...getActiveDateValues() ).toISOString()
 							: state.publishDate;
@@ -587,14 +603,18 @@ window.tsfLe = function () {
 				// This is how window.inlineEditTax.save() gets the taxonomy (actually, it gets it from anywhere on the page).
 				const taxonomy = inlineEditWrap.querySelector( 'input[name=taxonomy]' )?.value || '';
 
-				const writeTaxonomy = tsfCanonical.structIncludes( canonicalId, `%${taxonomy}%` );
+				const writeTaxonomy  = tsfCanonical.structIncludes( canonicalId, `%${taxonomy}%` );
+				const writeTermId    = tsfCanonical.structIncludes( canonicalId, '%term_id%' );
+				const hasQueryString = tsfCanonical.isQueryStructure(
+					tsfCanonical.getStateOf( canonicalId, 'urlStructure' ),
+				);
 
 				let termSlug    = '',
 					termName    = '',
 					parentSlugs = [];
 
 				// Unpack post slugs.
-				if ( writeTaxonomy ) {
+				if ( writeTaxonomy && ! hasQueryString ) {
 					tsfTermSlugs.store( state.parentTermSlugs, taxonomy );
 					// We preemptively write here because the selection might be unavailable.
 					parentSlugs = state.parentTermSlugs.map( term => term.slug ); // isHierarchical is checked in PHP for this.
@@ -602,10 +622,12 @@ window.tsfLe = function () {
 
 				/**
 				 * @since 5.1.0
+				 * @since 5.2.0 Now omits parent slugs for query-based term permalinks. See `get_term_link()`.
 				 *
 				 * @function
 				 */
 				const updateCanonical = () => {
+
 					if ( writeTaxonomy ) {
 						let activeSlug = '';
 
@@ -625,8 +647,14 @@ window.tsfLe = function () {
 						if ( ! activeSlug.length )
 							activeSlug = id;
 
-						urlDataParts.set( `%${taxonomy}%`, [ ...parentSlugs, activeSlug ].join( '/' ) );
+						urlDataParts.set(
+							`%${taxonomy}%`,
+							hasQueryString ? activeSlug : [ ...parentSlugs, activeSlug ].join( '/' ),
+						);
 					}
+
+					if ( writeTermId )
+						urlDataParts.set( '%term_id%', id );
 
 					updateCanonicalPlaceholder();
 				}
@@ -637,6 +665,7 @@ window.tsfLe = function () {
 						  termSlugInput = inlineEditWrap.querySelector( '[name=slug]' );
 
 					const updateTermName = () => {
+
 						// Title isn't used directly, but may be used if the slug isn't set.
 						termName = termNameInput?.value ?? '';
 						termSlug = termSlugInput?.value ?? ''
@@ -660,6 +689,7 @@ window.tsfLe = function () {
 				 */
 				const setRobotsDefaultIndexingState = tsfUtils.debounce(
 					() => {
+
 						let _defaultIndexOption = indexSelect.querySelector( '[value="0"]' ),
 							indexDefaultValue   = '';
 
@@ -678,10 +708,7 @@ window.tsfLe = function () {
 						}
 
 						if ( _defaultIndexOption )
-							_defaultIndexOption.innerHTML = indexSelect.dataset.defaultI18n.replace(
-								'%s',
-								tsf.escapeString( tsf.decodeEntities( indexDefaultValue ) )
-							);
+							_defaultIndexOption.textContent = ( indexSelect.dataset.defaultI18n || '' ).replace( '%s', indexDefaultValue ?? '' );
 
 						updateCanonicalPlaceholder();
 					},
@@ -703,6 +730,7 @@ window.tsfLe = function () {
 			 * @param {Number} value
 			 */
 			const setRobotsIndexingState = value => {
+
 				let type = '';
 
 				switch ( +value ) {
@@ -730,12 +758,35 @@ window.tsfLe = function () {
 	}
 
 	/**
+	 * Passes quick-edit term data to primary-term handlers.
+	 *
+	 * @since 5.1.3
+	 * @access private
+	 *
+	 * @param {string} id The post ID.
+	 */
+	function _prepareTermInput( id ) {
+		window.tsfPTLE._prepareQuickEditTerms( id, postData?.primaryTerms );
+	}
+
+	/**
+	 * Ensures bulk-edit primary term selectors are available.
+	 *
+	 * @since 5.1.3
+	 * @access private
+	 */
+	function _prepareTermInputBulk() {
+		window.tsfPTLE._prepareBulkEditTerms();
+	}
+
+	/**
 	 * Initializes List-edit listeners on ready.
 	 *
 	 * @since 4.0.0
 	 * @access private
 	 */
 	function _setListeners() {
+
 		document.addEventListener( 'tsfLeDispatchUpdate', _dispatchUpdate );
 		document.addEventListener( 'tsfLeUpdated', _updated );
 	}
@@ -764,7 +815,8 @@ window.tsfLe = function () {
 				if ( 'object' === typeof id )
 					id = window.inlineEditPost?.getId( id );
 
-				if ( ! id ) return ret;
+				if ( ! id )
+					return ret;
 
 				_editType  = 'post';
 				fieldsData = JSON.parse( document.getElementById( `tsfLeData[${id}]` )?.dataset.le || 0 ) || {};
@@ -775,6 +827,7 @@ window.tsfLe = function () {
 					_prepareVisibilityInput,
 					_prepareTitleInput,
 					_prepareDescriptionInput,
+					_prepareTermInput,
 				].forEach( fn => {
 					try {
 						fn( id );
@@ -792,12 +845,13 @@ window.tsfLe = function () {
 		if ( _oldInlineEditTax ) {
 			window.inlineEditTax.edit = function( id ) {
 
-				let ret = _oldInlineEditTax.apply( this, arguments );
+				const ret = _oldInlineEditTax.apply( this, arguments );
 
 				if ( 'object' === typeof id )
 					id = window.inlineEditTax?.getId( id );
 
-				if ( ! id ) return ret;
+				if ( ! id )
+					return ret;
 
 				_editType  = 'tax';
 				fieldsData = JSON.parse( document.getElementById( `tsfLeData[${id}]` )?.dataset.le || 0 ) || {};
@@ -819,6 +873,27 @@ window.tsfLe = function () {
 				return ret;
 			}
 		}
+
+		// Hook for bulk edit
+		const _oldBulkEdit = window.inlineEditPost?.setBulk;
+		if ( _oldBulkEdit ) {
+			window.inlineEditPost.setBulk = function () {
+
+				const ret = _oldBulkEdit.apply( this, arguments );
+
+				[
+					_prepareTermInputBulk,
+				].forEach( fn => {
+					try {
+						fn();
+					} catch ( error ) {
+						console.error( `Error in ${fn.name}:`, error );
+					}
+				} );
+
+				return ret;
+			}
+		}
 	}
 
 	return {
@@ -832,6 +907,7 @@ window.tsfLe = function () {
 		 * @function
 		 */
 		load: () => {
+
 			document.body.addEventListener( 'tsf-onload', _setListeners );
 			document.body.addEventListener( 'tsf-onload', _hijackListeners );
 		},

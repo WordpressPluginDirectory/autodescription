@@ -8,14 +8,14 @@ namespace The_SEO_Framework\Data\Admin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
 	Helper\Taxonomy,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -36,19 +36,31 @@ use \The_SEO_Framework\{
  * @since 5.0.0
  * @access private
  */
-class Post {
+final class Post {
 
 	/**
-	 * @since 5.0.0
-	 * @var string The nonce name.
+	 * @since 5.1.3
+	 * @var array[] {
+	 *     The nonce data per save context.
+	 *
+	 *     @type string $name   The nonce field name.
+	 *     @type string $action The nonce action.
+	 * }
 	 */
-	public static $nonce_name = 'tsf_singular_nonce_name';
-
-	/**
-	 * @since 5.0.0
-	 * @var string The nonce action.
-	 */
-	public static $nonce_action = 'tsf_singular_nonce_action';
+	public const SAVE_NONCES = [
+		'post-edit'  => [
+			'name'   => 'tsf_post_nonce_name',
+			'action' => 'tsf_post_nonce_action',
+		],
+		'quick-edit' => [
+			'name'   => 'tsf_post_nonce_name',
+			'action' => 'tsf_post_nonce_action',
+		],
+		'bulk-edit'  => [
+			'name'   => 'tsf_post_nonce_name',
+			'action' => 'tsf_post_nonce_action',
+		],
+	];
 
 	/**
 	 * Saves the Post SEO Meta settings on quick-edit, bulk-edit, or post-edit.
@@ -67,18 +79,18 @@ class Post {
 	 * @param int $post_id The post ID.
 	 */
 	public static function update_meta( $post_id ) {
-		// phpcs:disable, WordPress.Security.NonceVerification
+		// phpcs:disable WordPress.Security.NonceVerification
 
 		if ( ! empty( $_POST['autodescription-quick'] ) ) {
-			static::update_via_quick_edit( $post_id );
+			self::update_via_quick_edit( $post_id );
 		} elseif ( ! empty( $_REQUEST['autodescription-bulk'] ) ) {
 			// This is sent via GET. Keep using $_REQUEST for future-compatibility.
-			static::update_via_bulk_edit( $post_id );
+			self::update_via_bulk_edit( $post_id );
 		} elseif ( ! empty( $_POST['autodescription'] ) ) {
-			static::update_via_post_edit( $post_id );
+			self::update_via_post_edit( $post_id );
 		}
 
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -90,16 +102,14 @@ class Post {
 	 *              2. Now allows updating during `WP_AJAX`.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `_save_inpost_primary_term`.
+	 * @since 5.1.3 Now supports quick-edit and bulk-edit.
+	 * @since 5.2.0 Now does not clear a primary term during bulk edit.
 	 *
 	 * @param int $post_id The post ID.
-	 * @return void
 	 */
 	public static function update_primary_term( $post_id ) {
 
-		// The 'autodescription' index should only be used when using the editor.
-		// Quick and bulk-edit should be halted here.
-		if ( empty( $_POST['autodescription'] ) ) return;
-
+		// This resolves a quirk, since wp_insert_post() has no proper guard.
 		$post_id = \get_post( $post_id )->ID ?? null;
 
 		if ( empty( $post_id ) ) return;
@@ -111,27 +121,80 @@ class Post {
 		 * @link https://github.com/sybrew/the-seo-framework/issues/48
 		 * @link https://johnblackbourn.com/post-meta-revisions-wordpress
 		 */
-		if ( \wp_is_post_autosave( $post_id ) || \wp_is_post_revision( $post_id ) ) return;
+		if (
+			   \wp_is_post_autosave( $post_id )
+			|| \wp_is_post_revision( $post_id )
+		) {
+			return;
+		}
 
-		// Check that the user is allowed to edit the post. Nonce checks are done in bulk later.
 		if ( ! \current_user_can( 'edit_post', $post_id ) ) return;
 
-		$post_type = \get_post_type( $post_id ) ?: false;
+		$post_type = \get_post_type( $post_id );
 		// Can this even fail?
 		if ( empty( $post_type ) ) return;
 
-		foreach ( Taxonomy::get_hierarchical( 'names', $post_type ) as $taxonomy ) {
-			// Redundant. Fortified.
-			if ( ! \wp_verify_nonce(
-				$_POST[ static::$nonce_name . "_pt_{$taxonomy}" ] ?? '', // If empty, wp_verify_nonce will return false.
-				static::$nonce_action . '_pt',
-			) ) continue;
+		// Determine edit type: post-edit, quick-edit, or bulk-edit
+		if ( ! empty( $_POST['autodescription'] ) ) {
+			// Post-edit
+			foreach ( Taxonomy::get_hierarchical( 'names', $post_type ) as $taxonomy ) {
+				if ( ! \wp_verify_nonce(
+					$_POST[ self::SAVE_NONCES['post-edit']['name'] . "_pt_{$taxonomy}" ] ?? '',
+					self::SAVE_NONCES['post-edit']['action'] . '_pt',
+				) ) {
+					continue;
+				}
 
-			Data\Plugin\Post::update_primary_term_id(
-				$post_id,
-				$taxonomy,
-				\absint( $_POST['autodescription'][ "_primary_term_{$taxonomy}" ] ?? 0 ),
-			);
+				Data\Plugin\Post::update_primary_term_id(
+					$post_id,
+					$taxonomy,
+					\absint( $_POST['autodescription'][ "_primary_term_{$taxonomy}" ] ?? 0 ),
+				);
+			}
+		} elseif ( ! empty( $_POST['autodescription-quick'] ) ) {
+			// Quick-edit
+			if ( ! \check_ajax_referer( 'inlineeditnonce', '_inline_edit', false ) )
+				return;
+
+			foreach ( Taxonomy::get_hierarchical( 'names', $post_type ) as $taxonomy ) {
+				if ( ! isset( $_POST['autodescription-quick'][ "primary_term_{$taxonomy}" ] ) )
+					continue;
+
+				$term_id = \absint( \wp_unslash( $_POST['autodescription-quick'][ "primary_term_{$taxonomy}" ] ) );
+
+				if ( $term_id > 0 )
+					Data\Plugin\Post::update_primary_term_id( $post_id, $taxonomy, $term_id );
+			}
+		} elseif ( ! empty( $_REQUEST['autodescription-bulk'] ) ) {
+			// Bulk-edit
+			static $verified_bulk_referer = false;
+
+			if ( ! $verified_bulk_referer ) {
+				\check_admin_referer( 'bulk-posts' );
+				$verified_bulk_referer = true;
+			}
+
+			foreach ( Taxonomy::get_hierarchical( 'names', $post_type ) as $taxonomy ) {
+				if ( ! isset( $_REQUEST['autodescription-bulk'][ "primary_term_{$taxonomy}" ] ) )
+					continue;
+
+				$value = $_REQUEST['autodescription-bulk'][ "primary_term_{$taxonomy}" ];
+
+				if ( 'nochange' === $value ) continue;
+
+				$term_id = \absint( $value );
+
+				if ( $term_id > 0 ) {
+					$terms = \get_the_terms( $post_id, $taxonomy );
+
+					if ( $terms && ! \is_wp_error( $terms ) ) {
+						$valid_term_ids = \array_column( $terms, 'term_id' );
+
+						if ( \in_array( $term_id, $valid_term_ids, true ) )
+							Data\Plugin\Post::update_primary_term_id( $post_id, $taxonomy, $term_id );
+					}
+				}
+			}
 		}
 	}
 
@@ -143,7 +206,6 @@ class Post {
 	 *              2. Renamed from `update_post_edit_post_meta`.
 	 *
 	 * @param int $post_id The post ID.
-	 * @return void
 	 */
 	private static function update_via_post_edit( $post_id ) {
 
@@ -160,16 +222,23 @@ class Post {
 		 * @link https://core.trac.wordpress.org/ticket/20299#comment:64
 		 * @link https://make.wordpress.org/core/2023/10/24/framework-for-storing-revisions-of-post-meta-in-6-4/
 		 */
-		if ( \wp_is_post_autosave( $post_id ) || \wp_is_post_revision( $post_id ) ) return;
+		if (
+			   \wp_is_post_autosave( $post_id )
+			|| \wp_is_post_revision( $post_id )
+		) {
+			return;
+		}
 
-		// Check that the user is allowed to edit the post
+		// Check that the user is allowed to edit the post. This is redundant and may need to be removed for full Gutenberg support.
 		if (
 			   ! \current_user_can( 'edit_post', $post_id )
-			|| ! isset( $_POST[ static::$nonce_name ] )
-			|| ! \wp_verify_nonce( $_POST[ static::$nonce_name ], static::$nonce_action )
-		) return;
+			|| ! isset( $_POST[ self::SAVE_NONCES['post-edit']['name'] ] )
+			|| ! \wp_verify_nonce( $_POST[ self::SAVE_NONCES['post-edit']['name'] ], self::SAVE_NONCES['post-edit']['action'] )
+		) {
+			return;
+		}
 
-		// Perform nonce check and save fields.
+		// Trim, sanitize, and save the metadata.
 		Data\Plugin\Post::save_meta(
 			$post_id,
 			(array) \wp_unslash( $_POST['autodescription'] ),
@@ -185,7 +254,6 @@ class Post {
 	 *              2. Renamed from `update_quick_edit_post_meta`.
 	 *
 	 * @param int $post_id The post ID.
-	 * @return void
 	 */
 	private static function update_via_quick_edit( $post_id ) {
 
@@ -198,7 +266,11 @@ class Post {
 		if (
 			   ! \current_user_can( 'edit_post', $post_id )
 			|| ! \check_ajax_referer( 'inlineeditnonce', '_inline_edit', false )
-		) return;
+			|| ! isset( $_POST[ self::SAVE_NONCES['quick-edit']['name'] ] )
+			|| ! \wp_verify_nonce( $_POST[ self::SAVE_NONCES['quick-edit']['name'] ], self::SAVE_NONCES['quick-edit']['action'] )
+		) {
+			return;
+		}
 
 		$new_data = [];
 
@@ -221,6 +293,7 @@ class Post {
 
 				case 'canonical':
 					$new_data['_genesis_canonical_uri'] = $value;
+					break;
 			}
 		}
 
@@ -235,14 +308,13 @@ class Post {
 	}
 
 	/**
-	 * Overwrites a park of the post meta on bulk-edit.
+	 * Overwrites a part of the post meta on bulk-edit.
 	 *
 	 * @since 4.0.0
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `update_bulk_edit_post_meta`.
 	 *
 	 * @param int $post_id The post ID.
-	 * @return void
 	 */
 	private static function update_via_bulk_edit( $post_id ) {
 
@@ -258,6 +330,14 @@ class Post {
 		// Memoize the referer check--if it passes (and doesn't exit/die PHP), we're good to execute subsequently.
 		if ( ! $verified_referer ) {
 			\check_admin_referer( 'bulk-posts' );
+
+			if (
+				   ! isset( $_REQUEST[ self::SAVE_NONCES['bulk-edit']['name'] ] )
+				|| ! \wp_verify_nonce( $_REQUEST[ self::SAVE_NONCES['bulk-edit']['name'] ], self::SAVE_NONCES['bulk-edit']['action'] )
+			) {
+				return;
+			}
+
 			$verified_referer = true;
 		}
 
@@ -272,8 +352,7 @@ class Post {
 					case 'noindex':
 					case 'nofollow':
 					case 'noarchive':
-						if ( 'nochange' === $value )
-							break;
+						if ( 'nochange' === $value ) break;
 						$new_data[ "_genesis_$key" ] = $value;
 				}
 			}

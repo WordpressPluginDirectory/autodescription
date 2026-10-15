@@ -6,24 +6,23 @@
 
 namespace The_SEO_Framework;
 
-\defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) or die;
+( \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) ) or die;
 
-use \The_SEO_Framework\Admin\Settings\Layout\{
+use The_SEO_Framework\Admin\Settings\Layout\{
 	HTML,
 	Input,
 };
-use \The_SEO_Framework\Helper\{
+use The_SEO_Framework\Helper\{
 	Format\Markdown,
 	Post_Type,
-	Query,
 	Taxonomy,
 };
 
-// phpcs:disable, WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
+// phpcs:disable WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2016 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2016 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -79,13 +78,13 @@ switch ( $instance ) :
 			 * @since 2.8.0
 			 * @param array $tabs The default tabs.
 			 */
-			(array) \apply_filters( 'the_seo_framework_general_settings_tabs', $tabs )
+			(array) \apply_filters( 'the_seo_framework_general_settings_tabs', $tabs ),
 		);
 		break;
 
 	case 'layout':
 		HTML::header_title( \__( 'Administrative Layout Settings', 'autodescription' ) );
-		HTML::description( \__( 'SEO hints can be visually displayed throughout the dashboard.', 'autodescription' ) );
+		HTML::description( \__( 'SEO hints and options are displayed throughout the dashboard.', 'autodescription' ) );
 
 		?>
 		<hr>
@@ -138,7 +137,7 @@ switch ( $instance ) :
 
 		$character_info = HTML::make_info(
 			\__( 'The character counter is based on guidelines.', 'autodescription' ),
-			'',
+			'https://kb.theseoframework.com/?p=48#character-counters',
 			false,
 		);
 
@@ -157,6 +156,60 @@ switch ( $instance ) :
 			],
 			true,
 		);
+
+		?>
+		<hr>
+		<?php
+		HTML::header_title( \__( 'Option Field Settings', 'autodescription' ) );
+
+		$term_info = HTML::make_info(
+			\__( 'Terms are entries in taxonomies, e.g., Categories and Tags.', 'autodescription' ),
+			'',
+			false,
+		);
+
+		HTML::wrap_fields(
+			[
+				Input::make_checkbox( [
+					'id'     => 'display_list_edit_options',
+					'label'  => \esc_html__( 'Display quick-edit and bulk-edit option fields?', 'autodescription' ),
+					'escape' => false,
+				] ),
+				Input::make_checkbox( [
+					'id'     => 'display_term_edit_options',
+					'label'  => \esc_html__( 'Display term-edit option fields?', 'autodescription' ) . " $term_info",
+					'escape' => false,
+				] ),
+				Input::make_checkbox( [
+					'id'     => 'display_user_edit_options',
+					'label'  => \esc_html__( 'Display user-edit option fields?', 'autodescription' ),
+					'escape' => false,
+				] ),
+			],
+			true,
+		);
+
+		HTML::description( \__( 'Note: Hiding option fields does not remove the data once stored in them.', 'autodescription' ) );
+
+		?>
+		<hr>
+		<?php
+		HTML::header_title( \__( 'Editing Settings', 'autodescription' ) );
+
+		$editing_info = HTML::make_info(
+			\__( 'Clicking an empty input field keeps the blurred placeholder and places the cursor where you clicked. Editing makes it normal text. Clearing the field returns the placeholder.', 'autodescription' ),
+			'',
+			false,
+		);
+
+		HTML::wrap_fields(
+			Input::make_checkbox( [
+				'id'     => 'edit_proposed_values',
+				'label'  => \esc_html__( 'Edit generated values directly?', 'autodescription' ) . " $editing_info",
+				'escape' => false,
+			] ),
+			true,
+		);
 		break;
 
 	case 'performance':
@@ -170,15 +223,21 @@ switch ( $instance ) :
 		HTML::description_noesc(
 			\esc_html__( "Altering the query allows for more control of the site's hierarchy.", 'autodescription' )
 			. '<br>' .
-			\esc_html__( 'If your website has thousands of pages, these options can greatly affect database performance.', 'autodescription' )
+			\esc_html__( 'If your website has thousands of pages, these options can greatly affect database performance.', 'autodescription' ),
 		);
 
 		HTML::description_noesc(
 			\esc_html__( 'Altering the query in the database is more accurate, but can increase database query time.', 'autodescription' )
 			. '<br>' .
-			\esc_html__( 'Altering the query on the site is much faster, but can lead to inconsistent pagination. It can also lead to 404 error messages if all queried pages have been excluded.', 'autodescription' )
+			\esc_html__( 'Altering the query on the site is much faster, but can lead to inconsistent pagination. It can also lead to 404 error messages if all queried pages have been excluded.', 'autodescription' ),
 		);
 
+		/**
+		 * Values other than `in_query` and `post_query` aren't saved.
+		 *
+		 * @since 5.0.0
+		 * @param array $query_types The query alteration options by option value.
+		 */
 		$query_types = (array) \apply_filters(
 			'the_seo_framework_query_alteration_types',
 			[
@@ -249,7 +308,7 @@ switch ( $instance ) :
 				Input::make_checkbox( [
 					'id'     => 'alter_archive_query',
 					'label'  => \esc_html__( 'Enable archive query alteration?', 'autodescription' )
-						. ' ' . HTML::make_info( \__( 'This allows you to exclude pages from on-site archive listings.', 'autodescription' ), '', false ),
+						. ' ' . HTML::make_info( \__( 'This allows you to exclude pages from on-site archive listings and feeds.', 'autodescription' ), '', false ),
 					'escape' => false,
 				] ),
 				$archive_query_select_field,
@@ -366,9 +425,9 @@ switch ( $instance ) :
 					<input type=radio name="<?php Input::field_name( 'timestamps_format' ); ?>" id="<?php Input::field_id( 'timestamps_format_0' ); ?>" value=0 <?php \checked( Data\Plugin::get_option( 'timestamps_format' ), '0' ); ?>>
 					<label for="<?php Input::field_id( 'timestamps_format_0' ); ?>">
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput -- code_wrap escapes.
+						// phpcs:ignore WordPress.Security.EscapeOutput -- code_wrap escapes.
 						echo HTML::code_wrap( $timestamp_date ), ' ', HTML::make_info(
-							\__( 'This outputs the complete date.', 'autodescription' )
+							\__( 'This outputs the complete date.', 'autodescription' ),
 						);
 						?>
 					</label>
@@ -377,9 +436,9 @@ switch ( $instance ) :
 					<input type=radio name="<?php Input::field_name( 'timestamps_format' ); ?>" id="<?php Input::field_id( 'timestamps_format_1' ); ?>" value=1 <?php \checked( Data\Plugin::get_option( 'timestamps_format' ), '1' ); ?>>
 					<label for="<?php Input::field_id( 'timestamps_format_1' ); ?>">
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput -- code_wrap escapes.
+						// phpcs:ignore WordPress.Security.EscapeOutput -- code_wrap escapes.
 						echo HTML::code_wrap( $timestamp_datetime ), ' ', HTML::make_info(
-							\__( 'This outputs the complete date including hours, minutes, seconds, and time zone.', 'autodescription' )
+							\__( 'This outputs the complete date including hours, minutes, seconds, and time zone.', 'autodescription' ),
 						);
 						?>
 					</label>

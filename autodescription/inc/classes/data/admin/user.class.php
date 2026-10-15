@@ -8,11 +8,16 @@ namespace The_SEO_Framework\Data\Admin;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\Data;
+use function The_SEO_Framework\is_headless;
+
+use The_SEO_Framework\{
+	Data,
+	Helper,
+};
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -33,7 +38,24 @@ use \The_SEO_Framework\Data;
  * @since 5.0.0
  * @access private
  */
-class User {
+final class User {
+
+	/**
+	 * @since 5.1.3
+	 * @var array[] {
+	 *     The nonce data per save context.
+	 *     WordPress's native nonce doesn't suffice because these options are togglable.
+	 *
+	 *     @type string $name   The nonce field name.
+	 *     @type string $action The nonce action.
+	 * }
+	 */
+	public const SAVE_NONCES = [
+		'user-edit' => [
+			'name'   => 'tsf_user_nonce_name',
+			'action' => 'tsf_user_nonce_action',
+		],
+	];
 
 	/**
 	 * Saves user profile fields.
@@ -45,28 +67,30 @@ class User {
 	 * @since 5.0.0 1. Now tests if our POST data is set at all before acting.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
 	 *              3. Renamed from `_update_user_meta`.
+	 * @since 5.2.0 1. Now returns early when user metadata is headless.
+	 *              2. Now uses `Helper\User::is_supported()` to gate saving.
+	 *              3. Now overwrites the stored meta from the profile form. Omitted fields use their defaults.
 	 * @access private
 	 *
 	 * @param int $user_id The user ID.
 	 */
 	public static function update_meta( $user_id ) {
 
-		if ( empty( $_POST['tsf-user-meta'] ) ) return;
+		if (
+			   empty( $_POST['tsf-user-meta'] )
+			|| ! \current_user_can( 'edit_user', $user_id )
+			|| is_headless( 'user' )
+			|| ! isset( $_POST[ self::SAVE_NONCES['user-edit']['name'] ] )
+			|| ! \wp_verify_nonce( $_POST[ self::SAVE_NONCES['user-edit']['name'] ], self::SAVE_NONCES['user-edit']['action'] )
+			|| ! Helper\User::is_supported( $user_id )
+		) {
+			return;
+		}
 
-		if ( ! \current_user_can( 'edit_user', $user_id ) ) return;
-
-		// Redundant. Before hooks fire, this is already checked.
-		\check_admin_referer( "update-user_{$user_id}" );
-
-		if ( ! Data\User::user_has_author_info_cap_on_network( $user_id ) ) return;
-
-		// We won't reset the data, just overwrite what's given.
-		// This is because we only update a portion of the meta.
-		$data = array_merge(
-			Data\Plugin\User::get_meta( $user_id ),
-			(array) ( $_POST['tsf-user-meta'] ?? [] ),
+		// Trim, sanitize, and save the metadata.
+		Data\Plugin\User::save_meta(
+			$user_id,
+			(array) \wp_unslash( $_POST['tsf-user-meta'] ),
 		);
-
-		Data\Plugin\User::save_meta( $user_id, $data );
 	}
 }

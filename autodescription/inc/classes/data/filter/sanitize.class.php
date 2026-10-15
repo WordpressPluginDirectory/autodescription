@@ -8,15 +8,15 @@ namespace The_SEO_Framework\Data\Filter;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
-	Helper,
-	Helper\Format\Strings,
-	Meta,
+use The_SEO_Framework\Helper\{
+	Format\Strings,
+	Redirect,
 };
+use The_SEO_Framework\Meta;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -36,22 +36,22 @@ use \The_SEO_Framework\{
  *
  * @since 5.0.0
  * @access protected
- *         Use tsf()->filter()->sanitize() instead.
+ *         Use tsf()->sanitize() instead.
  */
 class Sanitize {
 
 	/**
-	 * Sanitizes input to a boolean integer, i.e. 0, 1,
+	 * Sanitizes input to a Boolean integer, i.e. 0, 1,
 	 *
-	 * Uses double casting. First, we cast to boolean, then to int.
+	 * Uses double casting. First, we cast to Boolean, then to int.
 	 *
 	 * @since 2.2.2
 	 * @since 2.8.0 Method is now public.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `s_one_zero`.
 	 *
-	 * @param mixed $value The value to cast to a boolean integer.
-	 * @return int A boolean as a string (1 or 0)
+	 * @param mixed $value The value to cast to a Boolean integer.
+	 * @return int A Boolean as a string (1 or 0)
 	 */
 	public static function boolean_integer( $value ) {
 		return (int) (bool) $value;
@@ -72,6 +72,25 @@ class Sanitize {
 	 */
 	public static function numeric_string( $value ) {
 		return (string) (int) $value;
+	}
+
+	/**
+	 * Sanitizes the character counter type.
+	 *
+	 * Accepts 0, 1, 2, and 3. Anything above 3 becomes 0.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param mixed $value The counter type.
+	 * @return int The counter type. 0, 1, 2, or 3.
+	 */
+	public static function counter_type( $value ) {
+
+		$value = \absint( $value );
+
+		return $value > 3
+			? 0
+			: $value;
 	}
 
 	/**
@@ -123,30 +142,42 @@ class Sanitize {
 
 	/**
 	 * Sanitizes metadata content.
+	 *
+	 * It doesn't escape HTML. In fact, it can introduce HTML.
+	 * You MUST escape the output if needed.
+	 * This class is called Sanitize, not Escape.
+	 *
 	 * Returns single-line, trimmed text without duplicated spaces, nbsp, or tabs.
-	 * Also converts back-solidi to their respective HTML entities for non-destructive handling.
+	 * Then converts lone hyphens and back-solidi to their respective HTML entities
+	 * for non-destructive handling in wptexturize().
 	 * Also adds a capital P, dangit.
-	 * Finally, it texturizes the content.
+	 * Then it texturizes the content via said wptexturize().
+	 * Finally, it converts the hyphen and backslash entities back to their literal characters.
 	 *
 	 * @since 5.0.0
+	 * @since 5.1.3 Now decodes HTML entities at the end of its process.
 	 *
 	 * @param string $text The text.
 	 * @return string One line sanitized text.
 	 */
 	public static function metadata_content( $text ) {
 
-		if ( ! \is_scalar( $text ) || ! \strlen( $text ) ) return '';
+		if ( ! \is_scalar( $text ) || ! \strlen( $text ) )
+			return '';
 
-		return \wptexturize(
-			\capital_P_dangit(
-				static::backward_solidus_to_entity(
-					static::lone_hyphen_to_entity(
-						static::remove_repeated_spacing(
-							trim(
-								static::tab_to_space(
-									static::newline_to_space(
-										static::nbsp_to_space(
-											(string) $text,
+		// PHP 8.5+: pipe operator?
+		return html_entity_decode(
+			\wptexturize(
+				\capital_P_dangit(
+					self::backward_solidus_to_entity(
+						self::lone_hyphen_to_entity(
+							self::remove_repeated_spacing(
+								trim(
+									self::tab_to_space(
+										self::newline_to_space(
+											self::nbsp_to_space(
+												(string) $text,
+											),
 										),
 									),
 								),
@@ -155,6 +186,7 @@ class Sanitize {
 					),
 				),
 			),
+			\ENT_HTML5 | \ENT_QUOTES | \ENT_SUBSTITUTE,
 		);
 	}
 
@@ -170,7 +202,7 @@ class Sanitize {
 	public static function normalize_metadata_content_for_strcmp( $text ) {
 		// Why not blog_charset? Because blog_charset is there only to onboard non-UTF-8 to UTF-8.
 		return html_entity_decode(
-			static::metadata_content( $text ),
+			self::metadata_content( $text ),
 			\ENT_QUOTES | \ENT_SUBSTITUTE | \ENT_HTML5,
 			'UTF-8',
 		);
@@ -325,6 +357,27 @@ class Sanitize {
 	}
 
 	/**
+	 * Sanitizes a URL into a fully qualified http or https address.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param mixed $url An unsanitized URL.
+	 * @return string A fully qualified sanitized URL that matches the current scheme if current domain.
+	 */
+	public static function fully_qualified_url( $url ) {
+
+		$url = trim( $url );
+
+		if ( empty( $url ) )
+			return '';
+
+		return \sanitize_url(
+			Meta\URI\Utils::make_absolute_current_scheme_url( $url ),
+			[ 'https', 'http' ],
+		);
+	}
+
+	/**
 	 * Sanitizes the Redirect URL.
 	 *
 	 * @since 2.2.4
@@ -338,6 +391,7 @@ class Sanitize {
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `s_redirect_url`.
 	 *              3. No longer provides stripping URL queries via a filter.
+	 * @since 5.2.0 Now only allows the https and http protocols.
 	 *
 	 * @param string $url String with potentially unwanted redirect URL.
 	 * @return string The Sanitized Redirect URL
@@ -346,17 +400,17 @@ class Sanitize {
 
 		$url = trim( $url );
 
-		if ( empty( $url ) ) return '';
+		if ( empty( $url ) )
+			return '';
 
 		// This is also checked when performing a redirect.
-		if ( ! Helper\Redirect::allow_external_redirect() ) {
+		if ( ! Redirect::allow_external_redirect() ) {
 			$url = Meta\URI\Utils::set_url_scheme( Meta\URI\Utils::convert_path_to_url(
 				Meta\URI\Utils::set_url_scheme( $url, 'relative' ),
 			) );
 		}
 
-		// All WP defined protocols are allowed.
-		return \sanitize_url( $url );
+		return \sanitize_url( $url, [ 'https', 'http' ] );
 	}
 
 	/**
@@ -400,7 +454,7 @@ class Sanitize {
 		// This is over 350x faster than a polyfill for `array_is_list()`.
 		if ( isset( $details[0] ) && array_values( $details ) === $details ) {
 			foreach ( $details as $deets )
-				$sanitized_details[] = static::image_details( $deets ); // phpcs:ignore, VariableAnalysis.CodeAnalysis
+				$sanitized_details[] = self::image_details( $deets );
 
 			return $sanitized_details ?? [];
 		}
@@ -415,20 +469,23 @@ class Sanitize {
 			'filesize' => 0,
 		];
 
-		if ( empty( $details ) ) return $defaults;
+		if ( empty( $details ) )
+			return $defaults;
 
 		[ $url, $id, $width, $height, $alt, $caption, $filesize ] = array_values( array_merge( $defaults, $details ) );
 
-		if ( empty( $url ) ) return $defaults;
+		if ( empty( $url ) )
+			return $defaults;
 
 		$url = \sanitize_url( Meta\URI\Utils::make_absolute_current_scheme_url( $url ), [ 'https', 'http' ] );
 
-		if ( empty( $url ) ) return $defaults;
+		if ( empty( $url ) )
+			return $defaults;
 
 		/**
 		 * Skip APNG, BMP, ICO, TIFF, and SVG.
 		 *
-		 * @link <https://developer.twitter.com/en/docs/tweets/optimize-with-cards/overview/markup>
+		 * @link <https://web.archive.org/web/20260201012312/https://developer.x.com/en/docs/x-for-websites/cards/overview/markup>
 		 * @link <https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types>
 		 * jp(e)g, png, webp, and gif are supported. Assume all non-matches to fall in those categories,
 		 * since we don't perform a live MIME-test.
@@ -441,7 +498,9 @@ class Sanitize {
 			strtolower( strtok( pathinfo( $url, \PATHINFO_EXTENSION ), '?' ) ),
 			[ 'apng', 'bmp', 'ico', 'cur', 'svg', 'tif', 'tiff' ],
 			true,
-		) ) return $defaults;
+		) ) {
+			return $defaults;
+		}
 
 		$width  = \absint( $width );
 		$height = \absint( $height );
@@ -457,7 +516,8 @@ class Sanitize {
 				[ 'https', 'http' ],
 			) : '';
 
-			if ( empty( $url ) ) return $defaults;
+			if ( empty( $url ) )
+				return $defaults;
 
 			// No sanitization needed. PHP's getimagesize() returns the correct values.
 			$width  = $new_image[1];
@@ -466,7 +526,7 @@ class Sanitize {
 
 		if ( $alt ) {
 			$alt = \wp_strip_all_tags( $alt );
-			// 420: https://developer.twitter.com/en/docs/tweets/optimize-with-cards/overview/summary.html
+			// 420: https://web.archive.org/web/20260201012312/https://developer.x.com/en/docs/x-for-websites/cards/overview/markup
 			// Don't "ai"-trim if under, it's unlikely to always be a sentence. Trim to 417 to account for plausibly appended "...".
 			$alt = \strlen( $alt ) > 420 ? Strings::clamp_sentence( $alt, 0, 417 ) : $alt;
 		}
@@ -478,7 +538,7 @@ class Sanitize {
 	}
 
 	/**
-	 * Sanitizes the Facebook profile link. Makes an actual Facebook link if it isn't already.
+	 * Sanitizes the Facebook profile link.
 	 *
 	 * @since 2.2.2
 	 * @since 2.8.0 Method is now public.
@@ -487,16 +547,19 @@ class Sanitize {
 	 *              2. Now returns empty when using only spaces and tabs.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `s_facebook_profile`.
+	 *              3. Now trims only spaces and slashes, so a tab-only value is no longer emptied.
+	 * @since 5.2.0 Now strips a schemeless host before prefixing `https://www.facebook.com/`.
 	 *
 	 * @param string $link The unsanitized Facebook profile URL.
 	 * @return string The sanitized Facebook profile URL.
 	 */
 	public static function facebook_profile_link( $link ) {
 
-		$path = trim( Meta\URI\Utils::get_relative_part_from_url( $link ), ' /' );
+		$path = trim( Meta\URI\Utils::get_relative_part_from_url( $link ), ' /@' );
 
 		// /0 is a valid profile link.
-		if ( ! \strlen( $path ) ) return '';
+		if ( ! \strlen( $path ) )
+			return '';
 
 		$link = "https://www.facebook.com/{$path}";
 
@@ -504,12 +567,27 @@ class Sanitize {
 			// Extract query parameters.
 			parse_str( parse_url( $link, \PHP_URL_QUERY ), $r );
 
-			if ( empty( $r['id'] ) ) return '';
+			if ( empty( $r['id'] ) )
+				return '';
 
 			$link = 'https://www.facebook.com/profile.php?id=' . \absint( $r['id'] );
 		}
 
 		return \sanitize_url( $link );
+	}
+
+	/**
+	 * Sanitizes a Twitter card type.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param mixed $card The card type.
+	 * @return string A supported card type, or an empty string for the default selection.
+	 */
+	public static function twitter_card( $card ) {
+		return \in_array( $card, Meta\Twitter::get_supported_cards(), true )
+			? $card
+			: '';
 	}
 
 	/**
@@ -523,6 +601,7 @@ class Sanitize {
 	 *              2. Now returns empty when using only spaces and tabs.
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `s_twitter_name`.
+	 * @since 5.2.0 Now reads a schemeless profile URL, such as `x.com/username`, as the handle.
 	 *
 	 * @param string $handle An unsanitized profile handle.
 	 * @return string A sanitized profile handle with '@' prefixed to it.
@@ -532,7 +611,7 @@ class Sanitize {
 		$handle = preg_replace(
 			'/[^a-z\d_]/i',
 			'',
-			trim( Meta\URI\Utils::get_relative_part_from_url( $handle ), ' /@' )
+			trim( Meta\URI\Utils::get_relative_part_from_url( $handle ), ' /@' ),
 		);
 		$length = \strlen( $handle );
 
@@ -541,5 +620,181 @@ class Sanitize {
 			return '';
 
 		return "@$handle";
+	}
+
+	/**
+	 * Sanitizes a Fediverse profile handle.
+	 *
+	 * Accepts a WebFinger handle or a profile URL and returns `@user@domain`.
+	 * URLs are never kept: Mastodon treats a URL-shaped `fediverse:creator`
+	 * value as a handle and can fail the entire link preview. A guessed handle
+	 * from a URL host can be wrong; store the profile URL in the companion field.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string $value An unsanitized handle or profile URL.
+	 * @return string A sanitized `@user@domain` handle, or an empty string.
+	 */
+	public static function fediverse_profile_handle( $value ) {
+
+		$value = trim( $value );
+
+		if ( ! \strlen( $value ) )
+			return '';
+
+		if ( str_starts_with( $value, 'acct:' ) )
+			$value = substr( $value, 5 );
+
+		if ( str_contains( $value, '/' ) ) {
+			$parts = parse_url( \sanitize_url(
+				$value,
+				[ 'https', 'http' ],
+			) );
+			$host  = $parts['host'] ?? '';
+			$user  = self::fediverse_path_user( $parts['path'] ?? '' );
+
+			if ( ! \strlen( $host ) || ! \strlen( $user ) )
+				return '';
+
+			if ( str_contains( $user, '@' ) )
+				return self::normalize_fediverse_handle( $user );
+
+			return self::normalize_fediverse_handle( "$user@$host" );
+		}
+
+		return self::normalize_fediverse_handle( $value );
+	}
+
+	/**
+	 * Normalizes a WebFinger-like handle to `@user@domain`.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string $handle A handle such as `user@domain` or `@user@domain`.
+	 * @return string A sanitized `@user@domain` handle, or an empty string.
+	 */
+	private static function normalize_fediverse_handle( $handle ) {
+
+		$handle = trim( $handle, " \t@" );
+
+		if ( ! preg_match( '/^([^@]+)@([^@]+)$/', $handle, $matches ) )
+			return '';
+
+		$user = strtolower( rawurldecode( $matches[1] ) );
+		$host = strtolower( rawurldecode( $matches[2] ) );
+
+		// Strip the www subdomain from the handle; keep two-label hosts such as "www.fyi".
+		if (
+			   str_starts_with( $host, 'www.' )
+			&& substr_count( $host, '.' ) > 1
+		) {
+			$host = substr( $host, 4 );
+		}
+
+		if (
+			   \strlen( $user ) > 64
+			|| ! str_contains( $host, '.' )
+			|| ! preg_match( '/^[a-z0-9._-]+$/', $user )
+			|| ! preg_match( '/^[a-z0-9.-]+$/', $host )
+		) {
+			return '';
+		}
+
+		return "@$user@$host";
+	}
+
+	/**
+	 * Extracts a username from a Fediverse profile URL path.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string $path A URL path such as `/@user` or `/users/user`.
+	 * @return string The path username, a `user@other.host` remote path, or empty.
+	 */
+	private static function fediverse_path_user( $path ) {
+
+		$segments = explode( '/', trim( $path, '/' ) );
+
+		switch ( strtolower( $segments[0] ) ) {
+			case 'users':
+			case 'user':
+			case 'u':
+				$segment = $segments[1] ?? '';
+				break;
+			default:
+				if ( ! str_starts_with( $segments[0], '@' ) )
+					return '';
+
+				$segment = $segments[0];
+		}
+
+		return ltrim( rawurldecode( $segment ), '@' );
+	}
+
+	/**
+	 * Sanitizes a Fediverse profile URL.
+	 *
+	 * Accepts an HTTPS (or HTTP) profile URL. A handle is rejected. HTTP is
+	 * upgraded to HTTPS. The host is not rewritten from the companion handle.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string $value An unsanitized profile URL.
+	 * @return string A sanitized HTTPS profile URL, or an empty string.
+	 */
+	public static function fediverse_profile_url( $value ) {
+
+		$value = trim( $value );
+
+		if ( ! \strlen( $value ) )
+			return '';
+
+		// A handle is not a profile URL.
+		if ( ! str_contains( $value, '/' ) )
+			return '';
+
+		if ( preg_match( '/^([a-z][a-z0-9+.-]*):/i', $value, $matches ) ) {
+			if ( ! \in_array(
+				strtolower( $matches[1] ),
+				[ 'http', 'https' ],
+				true,
+			) ) {
+				return '';
+			}
+		} else {
+			$value = "https://$value";
+		}
+
+		$value = \sanitize_url(
+			preg_replace( '/^http:\/\//i', 'https://', $value, 1 ),
+			[ 'https' ],
+		);
+
+		if ( ! \strlen( $value ) )
+			return '';
+
+		$parts = parse_url( $value );
+		$host  = strtolower( $parts['host'] ?? '' );
+		$user  = self::fediverse_path_user( $parts['path'] ?? '' );
+
+		if (
+			   ! str_contains( $host, '.' )
+			|| ! preg_match( '/^[a-z0-9.-]+$/', $host )
+			|| ! \strlen( $user )
+		) {
+			return '';
+		}
+
+		if ( str_contains( $user, '@' ) ) {
+			if ( ! self::normalize_fediverse_handle( $user ) )
+				return '';
+		} elseif (
+			   \strlen( $user ) > 64
+			|| ! preg_match( '/^[a-z0-9._-]+$/', strtolower( $user ) )
+		) {
+			return '';
+		}
+
+		return $value;
 	}
 }

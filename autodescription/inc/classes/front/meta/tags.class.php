@@ -10,7 +10,7 @@ namespace The_SEO_Framework\Front\Meta;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -77,7 +77,7 @@ final class Tags {
 	 * @return callable[] Callbacks, passed by reference.
 	 */
 	public static function &tag_generators() {
-		return static::$tag_generators;
+		return self::$tag_generators;
 	}
 
 	/**
@@ -89,7 +89,7 @@ final class Tags {
 	 * @return array[] The meta tags, passed by reference.
 	 */
 	public static function &tags_render_data() {
-		return static::$tags_render_data;
+		return self::$tags_render_data;
 	}
 
 	/**
@@ -99,10 +99,10 @@ final class Tags {
 	 */
 	public static function fill_render_data_from_registered_generators() {
 
-		$tags_render_data = &static::$tags_render_data;
+		$tags_render_data = &self::$tags_render_data;
 		$i                = 0;
 
-		foreach ( static::$tag_generators as $callback )
+		foreach ( self::$tag_generators as $callback )
 			foreach ( \call_user_func( $callback ) as $id => $data )
 				$tags_render_data[ $id ?: ++$i ] = $data;
 	}
@@ -114,17 +114,17 @@ final class Tags {
 	 */
 	public static function render_tags() {
 
-		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use static::DATA_DEFAULTS hereinafter.
-		$data_defaults = static::DATA_DEFAULTS;
+		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use self::DATA_DEFAULTS hereinafter.
+		$data_defaults = self::DATA_DEFAULTS;
 		// Also remit FETCH_DIM_R by writing the index to variables: https://3v4l.org/SLKbq & https://3v4l.org/ipmh5.
 		$default_attributes = $data_defaults['attributes'];
 		$default_tag        = $data_defaults['tag'];
 		$default_content    = $data_defaults['content'];
 
-		foreach ( static::$tags_render_data as &$tagdata ) {
+		foreach ( self::$tags_render_data as &$tagdata ) {
 			if ( $tagdata['rendered'] ?? false ) continue;
 
-			static::render(
+			self::render(
 				$tagdata['attributes'] ??= $default_attributes,
 				$tagdata['tag']        ??= $default_tag,
 				$tagdata['content']    ??= $default_content,
@@ -135,22 +135,21 @@ final class Tags {
 	}
 
 	/**
-	 * Renders an XHTML element. Sane drop-in for DOMDocument and whatnot.
-	 *
-	 * Even though most (if not all) WordPress sites use HTML5, we expect some still use XHTML.
-	 * We expect HTML5 fully on the back-end.
+	 * Renders an HTML5 element. Sane, performant, and secure drop-in for DOMDocument and whatnot.
 	 *
 	 * @since 5.0.0
+	 * @since 5.2.0 Removed XHTML support. The tags are now always rendered in HTML5 syntax.
+	 * @example $attributes `[ 'href' => 'https://example.com/' ]`
 	 *
 	 * @param array         $attributes {
 	 *                          Associative array of tag names and tag values.
 	 *
-	 *                          @type string $value The attributes's value, keyed by name.
+	 *                          @type string {$name} The attributes's value.
 	 *                      }
 	 * @param string        $tag        The element's tag-name.
 	 * @param ?string|array $content    The tag's content. Leave null to not render content.
 	 *                                  It will create a content-wrapping element when filled.
-	 *                                  When array, accepts keys 'content' and boolean 'escape'.
+	 *                                  When array, accepts keys 'content' and Boolean 'escape'.
 	 */
 	public static function render(
 		$attributes = self::DATA_DEFAULTS['attributes'],
@@ -216,13 +215,14 @@ final class Tags {
 			);
 		}
 
-		// phpcs:disable, WordPress.Security.EscapeOutput -- already escaped.
+		// phpcs:disable WordPress.Security.EscapeOutput -- $attr is escaped above, and $content is conditionally escaped below.
 		if ( isset( $content ) ) {
+			// Normal elements.
 			vprintf(
 				'<%1$s%2$s>%3$s</%1$s>',
 				[
 					/** @link <https://www.w3.org/TR/2011/WD-html5-20110525/syntax.html#syntax-tag-name> */
-					preg_replace( '/[^a-z\d]+/i', '', $tag ), // phpcs:ignore, WordPress.Security.EscapeOutput -- this escapes.
+					preg_replace( '/[^a-z\d]+/i', '', $tag ), // phpcs:ignore WordPress.Security.EscapeOutput -- this escapes.
 					$attr,
 					\is_array( $content )
 						? (
@@ -234,14 +234,15 @@ final class Tags {
 				],
 			);
 		} else {
+			// Void elements.
 			printf(
-				'<%s%s />', // XHTML compatible.
+				'<%s%s>',
 				/** @link <https://www.w3.org/TR/2011/WD-html5-20110525/syntax.html#syntax-tag-name> */
 				preg_replace( '/[^0-9a-zA-Z]+/', '', $tag ),
 				$attr,
 			);
 		}
-		// phpcs:enable, WordPress.Security.EscapeOutput
+		// phpcs:enable WordPress.Security.EscapeOutput
 
 		echo "\n";
 	}

@@ -8,18 +8,20 @@ namespace The_SEO_Framework\Data\Filter;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\has_run;
+use function The_SEO_Framework\has_run;
 
-use \The_SEO_Framework\{
+use The_SEO_Framework\{
 	Data,
-	Helper\Taxonomy,
-	Helper\Post_Type,
 	Meta,
+};
+use The_SEO_Framework\Helper\{
+	Post_Type,
+	Taxonomy,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -40,11 +42,11 @@ use \The_SEO_Framework\{
  * @since 5.0.0
  * @access private
  */
-class Plugin {
+final class Plugin {
 
 	/**
 	 * @since 5.0.0
-	 * @var array[] The option filter sanitization callbacks.
+	 * @var array<string, callable[]> The option filter sanitization callbacks.
 	 */
 	private static $sanitizers = [];
 
@@ -56,6 +58,7 @@ class Plugin {
 	 * @since 2.2.2
 	 * @since 5.0.0 1. Moved from `\The_SEO_Framework\Load`.
 	 *              2. Renamed from `sanitize`.
+	 * @since 5.2.0 Now passes each sanitizer the previous sanitizer's return.
 	 *
 	 * @param mixed  $value          The sanitized [sic] option value.
 	 * @param string $option         The option name.
@@ -68,7 +71,7 @@ class Plugin {
 		if ( empty( $value ) || ! \is_array( $value ) )
 			return $original_value;
 
-		static::register_sanitizers_jit();
+		self::register_sanitizers_jit();
 
 		// Use our filterable options as a fallback instead.
 		$original_value = array_merge(
@@ -78,27 +81,29 @@ class Plugin {
 
 		/**
 		 * @since 5.0.0
-		 * @param array $filters {
-		 *     A map of option filters and their callbacks.
+		 * @since 5.2.0 Callbacks for one option now run in order. Each receives the previous return.
+		 * @example $sanitizers `[ 'title_separator' => [ 'sanitize_text_field' ] ]`
+		 * @param array<string, callable[]> $sanitizers {
+		 *     A map of option sanitizers and their callbacks.
 		 *
 		 *     @type callable[] {$option} The callback to sanitize the option indexed by option name.
 		 * }
 		 */
 		$sanitizers = \apply_filters(
 			'the_seo_framework_settings_update_sanitizers',
-			static::$sanitizers,
+			self::$sanitizers,
 		);
 
 		$store = [];
 
-		foreach ( $sanitizers as $suboption => $callbacks ) {
+		foreach ( $sanitizers as $sub_option => $callbacks ) {
 			foreach ( $callbacks as $callback ) {
-				$store[ $suboption ] = \call_user_func_array(
+				$store[ $sub_option ] = \call_user_func_array(
 					$callback,
 					[
-						$value[ $suboption ] ?? '', // If no value is sent, the form field was empty.
-						$original_value[ $suboption ], // If this fails, the option isn't registered properly. Error is good.
-						$suboption,
+						$store[ $sub_option ] ?? $value[ $sub_option ] ?? '', // If no value is sent, the form field was empty.
+						$original_value[ $sub_option ], // If this fails, the option isn't registered properly. Error is good.
+						$sub_option,
 					],
 				);
 			}
@@ -108,12 +113,13 @@ class Plugin {
 	}
 
 	/**
-	 * Add sanitization filters to suboptions.
+	 * Add sanitization filters to sub-options.
 	 * Will only set filters if they don't already exists. This allows for other
 	 * developers to add their custom filters before we do --- use filter
 	 * `'sanitize_option_' . \THE_SEO_FRAMEWORK_SITE_OPTIONS`.
 	 *
 	 * @since 5.0.0
+	 * @example $filters `[ 'title_separator' => 'sanitize_text_field' ]`
 	 *
 	 * @param array $filters {
 	 *     A map of option filters and their callbacks.
@@ -124,8 +130,8 @@ class Plugin {
 	 */
 	public static function register_sanitizers( $filters ) {
 
-		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use static::$filters hereinafter.
-		$_sanitizers = &static::$sanitizers;
+		// Remit FETCH_STATIC_PROP_R opcode calls every time we'd otherwise use self::$sanitizers hereinafter.
+		$_sanitizers = &self::$sanitizers;
 
 		foreach ( $filters as $option => $callbacks ) {
 			if ( \is_array( $callbacks[0] ) ) {
@@ -150,17 +156,20 @@ class Plugin {
 
 		$filters = [
 			'advanced_query_protection'    => 'checkbox',
-			'alter_archive_query'          => 'checkbox',
 			'alter_archive_query_type'     => 'alter_query_type',
+			'alter_archive_query'          => 'checkbox',
 			'alter_search_query_type'      => 'alter_query_type',
 			'alter_search_query'           => 'checkbox',
 			'author_noarchive'             => 'checkbox',
 			'author_nofollow'              => 'checkbox',
 			'author_noindex'               => 'checkbox',
-			'auto_description'             => 'checkbox',
 			'auto_description_html_method' => 'auto_description_method',
+			'auto_description'             => 'checkbox',
 			'baidu_verification'           => 'verification_code',
 			'bing_verification'            => 'verification_code',
+			'breadcrumb_archive'           => 'checkbox_array',
+			'breadcrumb_taxonomy'          => 'breadcrumb_taxonomy',
+			'breadcrumb_use_meta_title'    => 'checkbox',
 			'cache_sitemap'                => 'checkbox',
 			'canonical_scheme'             => 'canonical_scheme',
 			'date_noarchive'               => 'checkbox',
@@ -169,24 +178,33 @@ class Plugin {
 			'disabled_post_types'          => [ 'disabled_post_types', 'checkbox_array' ],
 			'disabled_taxonomies'          => [ 'disabled_taxonomies', 'checkbox_array' ],
 			'display_character_counter'    => 'checkbox',
+			'display_list_edit_options'    => 'checkbox',
 			'display_pixel_counter'        => 'checkbox',
 			'display_seo_bar_metabox'      => 'checkbox',
 			'display_seo_bar_tables'       => 'checkbox',
+			'display_term_edit_options'    => 'checkbox',
+			'display_user_edit_options'    => 'checkbox',
+			'edit_proposed_values'         => 'checkbox',
 			'excerpt_the_feed'             => 'checkbox',
 			'facebook_author'              => 'facebook_profile_link',
 			'facebook_publisher'           => 'facebook_profile_link',
 			'facebook_tags'                => 'checkbox',
+			'facebook_verification'        => 'verification_code',
+			'fediverse_creator'            => 'fediverse_profile_handle',
+			'fediverse_creator_url'        => 'fediverse_profile_url',
+			'fediverse_site'               => 'fediverse_profile_handle',
+			'fediverse_site_url'           => 'fediverse_profile_url',
 			'google_verification'          => 'verification_code',
 			'home_paged_noindex'           => 'checkbox',
 			'home_title_location'          => 'title_location',
+			'homepage_canonical'           => 'fully_qualified_url',
 			'homepage_description'         => 'metadata_text',
 			'homepage_noarchive'           => 'checkbox',
 			'homepage_nofollow'            => 'checkbox',
 			'homepage_noindex'             => 'checkbox',
-			'homepage_canonical'           => 'fully_qualified_url',
-			'homepage_redirect'            => 'fully_qualified_url',
 			'homepage_og_description'      => 'metadata_text',
 			'homepage_og_title'            => 'metadata_text',
+			'homepage_redirect'            => 'fully_qualified_url',
 			'homepage_social_image_id'     => 'absolute_integer',
 			'homepage_social_image_url'    => 'fully_qualified_url',
 			'homepage_tagline'             => 'checkbox',
@@ -206,6 +224,7 @@ class Plugin {
 			'knowledge_output'             => 'checkbox',
 			'knowledge_pinterest'          => 'fully_qualified_url',
 			'knowledge_soundcloud'         => 'fully_qualified_url',
+			'knowledge_tiktok'             => 'fully_qualified_url',
 			'knowledge_tumblr'             => 'fully_qualified_url',
 			'knowledge_twitter'            => 'fully_qualified_url',
 			'knowledge_type'               => 'knowledge_type',
@@ -271,18 +290,18 @@ class Plugin {
 			'twitter_tags'                 => 'checkbox',
 			'yandex_verification'          => 'verification_code',
 
-			// phpcs:disable, WordPress.Arrays.MultipleStatementAlignment.LongIndexSpaceBeforeDoubleArrow -- it fine.
+			// phpcs:disable WordPress.Arrays.MultipleStatementAlignment.LongIndexSpaceBeforeDoubleArrow -- it fine.
 			Data\Plugin\Helper::get_robots_option_index( 'post_type', 'noarchive' ) => 'checkbox_array',
 			Data\Plugin\Helper::get_robots_option_index( 'post_type', 'nofollow' )  => 'checkbox_array',
 			Data\Plugin\Helper::get_robots_option_index( 'post_type', 'noindex' )   => 'checkbox_array',
 			Data\Plugin\Helper::get_robots_option_index( 'taxonomy', 'noarchive' )  => 'checkbox_array',
 			Data\Plugin\Helper::get_robots_option_index( 'taxonomy', 'nofollow' )   => 'checkbox_array',
 			Data\Plugin\Helper::get_robots_option_index( 'taxonomy', 'noindex' )    => 'checkbox_array',
-			// phpcs:enable, WordPress.Arrays.MultipleStatementAlignment.LongIndexSpaceBeforeDoubleArrow
+			// phpcs:enable WordPress.Arrays.MultipleStatementAlignment.LongIndexSpaceBeforeDoubleArrow
 		];
 
 		// Remit FETCH_CLASS_NAME opcode, which performs a function call to check if it's valid.
-		$sanitizer_class = static::class;
+		$sanitizer_class = self::class;
 
 		foreach ( $filters as &$callbacks ) {
 			if ( \is_array( $callbacks ) ) {
@@ -293,14 +312,14 @@ class Plugin {
 			}
 		}
 
-		static::register_sanitizers( $filters );
+		self::register_sanitizers( $filters );
 	}
 
 	/**
 	 * @since 5.0.0
 	 *
 	 * @param mixed $value An unsanitized value.
-	 * @return int A boolean as a string (1 or 0) option value.
+	 * @return int A Boolean as a string (1 or 0) option value.
 	 */
 	public static function checkbox( $value ) {
 		return Sanitize::boolean_integer( $value );
@@ -329,7 +348,7 @@ class Plugin {
 	 *
 	 * @param mixed $value     An unsanitized value.
 	 * @param mixed $old_value The last known value.
-	 * @return string A sanitized verification code value.
+	 * @return string A valid description HTML method: `fast`, `accurate`, or `thorough`.
 	 */
 	public static function auto_description_method( $value, $old_value ) {
 
@@ -345,6 +364,7 @@ class Plugin {
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 Now actually extracts the content attribute from a pasted verification meta tag.
 	 *
 	 * @param mixed $value An unsanitized value.
 	 * @return string A sanitized verification code value.
@@ -352,10 +372,10 @@ class Plugin {
 	public static function verification_code( $value ) {
 
 		// Extract the content if it hasn't already in JS.
-		if ( str_contains( '<', $value ) ) {
-			$value = preg_match(
+		if ( str_contains( $value, '<' ) ) {
+			preg_match(
 				'/\bcontent=(?:([\'"])([^$]*?)\g{-2}|([^\s\/>]+))/i',
-				'$2',
+				$value,
 				$matches,
 			);
 
@@ -393,7 +413,8 @@ class Plugin {
 	 */
 	public static function disabled_post_types( $value ) {
 
-		if ( empty( $value ) || ! \is_array( $value ) ) return [];
+		if ( empty( $value ) || ! \is_array( $value ) )
+			return [];
 
 		foreach ( Post_Type::get_all_forced_supported() as $forced )
 			unset( $value[ $forced ] );
@@ -409,7 +430,8 @@ class Plugin {
 	 */
 	public static function disabled_taxonomies( $value ) {
 
-		if ( empty( $value ) || ! \is_array( $value ) ) return [];
+		if ( empty( $value ) || ! \is_array( $value ) )
+			return [];
 
 		foreach ( Taxonomy::get_all_forced_supported() as $forced )
 			unset( $value[ $forced ] );
@@ -421,14 +443,39 @@ class Plugin {
 	 * @since 5.0.0
 	 *
 	 * @param mixed $value An unsanitized value.
-	 * @return int[] An array of boolean as a string (1 or 0).
+	 * @return int[] An array of Boolean as a string (1 or 0).
 	 */
 	public static function checkbox_array( $value ) {
 
-		if ( empty( $value ) || ! \is_array( $value ) ) return [];
+		if ( empty( $value ) || ! \is_array( $value ) )
+			return [];
 
 		foreach ( $value as &$val )
 			$val = Sanitize::boolean_integer( $val );
+
+		return $value;
+	}
+
+	/**
+	 * @since 5.2.0
+	 * @example $value `[ 'post' => 'category', 'page' => '-1' ]`
+	 *
+	 * @param mixed $value An unsanitized value.
+	 * @return array<string,string> {
+	 *     The taxonomy crumb settings, keyed by post type name.
+	 *
+	 *     @type string {$post_type} A taxonomy name, or `-1` to exclude the taxonomy crumb.
+	 *                               Empty uses the post type's first public hierarchical taxonomy.
+	 * }
+	 */
+	public static function breadcrumb_taxonomy( $value ) {
+
+		if ( empty( $value ) || ! \is_array( $value ) )
+			return [];
+
+		// Do NOT test for post type or taxonomy existence -- it might be registered too late (incorrectly).
+		foreach ( $value as &$taxonomy )
+			$taxonomy = \is_scalar( $taxonomy ) ? (string) $taxonomy : '';
 
 		return $value;
 	}
@@ -441,6 +488,26 @@ class Plugin {
 	 */
 	public static function facebook_profile_link( $value ) {
 		return Sanitize::facebook_profile_link( $value );
+	}
+
+	/**
+	 * @since 5.2.0
+	 *
+	 * @param mixed $value An unsanitized value.
+	 * @return string A sanitized Fediverse profile handle.
+	 */
+	public static function fediverse_profile_handle( $value ) {
+		return Sanitize::fediverse_profile_handle( $value );
+	}
+
+	/**
+	 * @since 5.2.0
+	 *
+	 * @param mixed $value An unsanitized value.
+	 * @return string A sanitized Fediverse profile URL.
+	 */
+	public static function fediverse_profile_url( $value ) {
+		return Sanitize::fediverse_profile_url( $value );
 	}
 
 	/**
@@ -475,7 +542,7 @@ class Plugin {
 	 * @since 5.0.0
 	 *
 	 * @param mixed $value An unsanitized value.
-	 * @return string Either left or right.
+	 * @return int An absolute integer.
 	 */
 	public static function absolute_integer( $value ) {
 		return \absint( $value );
@@ -488,13 +555,7 @@ class Plugin {
 	 * @return string A fully qualified sanitized URL that matches the current scheme if current domain.
 	 */
 	public static function fully_qualified_url( $value ) {
-
-		if ( empty( $value ) ) return '';
-
-		return \sanitize_url(
-			Meta\URI\Utils::make_absolute_current_scheme_url( $value ),
-			[ 'https', 'http' ],
-		);
+		return Sanitize::fully_qualified_url( $value );
 	}
 
 	/**
@@ -549,7 +610,7 @@ class Plugin {
 	 * @since 5.0.0
 	 *
 	 * @param mixed $value An unsanitized value.
-	 * @return string A valid copyright content length option value.
+	 * @return string A sanitized hexadecimal color.
 	 */
 	public static function rgb_hex( $value ) {
 		return Sanitize::rgb_hex( $value );
@@ -557,17 +618,20 @@ class Plugin {
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 An empty value now falls back to the default option.
 	 *
-	 * @param mixed $value     An unsanitized value.
-	 * @param mixed $old_value The last known value.
+	 * @param mixed  $value      An unsanitized value.
+	 * @param mixed  $old_value  The last known value.
+	 * @param string $sub_option The option name.
 	 * @return int A valid sitemap query limit.
 	 */
-	public static function sitemap_query_limit( $value, $old_value ) {
+	public static function sitemap_query_limit( $value, $old_value, $sub_option ) {
+		// At least 1, at most 50000.
 		return max(
 			1,
 			min(
 				50000,
-				\absint( $value ) ?: $old_value,
+				\absint( $value ) ?: Data\Plugin\Setup::get_default_option( $sub_option ),
 			),
 		);
 	}
@@ -599,35 +663,27 @@ class Plugin {
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 Now uses Sanitize::twitter_card(). An empty or unknown value selects the default.
 	 *
-	 * @param mixed $value     An unsanitized value.
-	 * @param mixed $old_value The last known value.
-	 * @return string A valid Twitter card type.
+	 * @param mixed $value An unsanitized value.
+	 * @return string A supported Twitter card type, or an empty string for the default.
 	 */
-	public static function homepage_twitter_card( $value, $old_value ) {
-
-		if ( \in_array( $value, Meta\Twitter::get_supported_cards(), true ) )
-			return $value;
-
-		if ( empty( $value ) )
-			return ''; // Default.
-
-		return $old_value;
+	public static function homepage_twitter_card( $value ) {
+		return Sanitize::twitter_card( $value );
 	}
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 Now keeps the previous card when it is still supported, and otherwise uses the first supported card.
 	 *
 	 * @param mixed $value     An unsanitized value.
 	 * @param mixed $old_value The last known value.
-	 * @return string A valid Twitter card type.
+	 * @return string A supported Twitter card type.
 	 */
 	public static function twitter_card( $value, $old_value ) {
-
-		if ( \in_array( $value, Meta\Twitter::get_supported_cards(), true ) )
-			return $value;
-
-		return $old_value;
+		return Sanitize::twitter_card( $value )
+			?: Sanitize::twitter_card( $old_value )
+			?: array_first( Meta\Twitter::get_supported_cards() );
 	}
 
 	/**
@@ -635,7 +691,7 @@ class Plugin {
 	 * @link <https://help.twitter.com/en/managing-your-account/change-x-handle>
 	 *
 	 * @param mixed $value An unsanitized value.
-	 * @return string A valid title separator.
+	 * @return string A sanitized Twitter/X profile handle.
 	 */
 	public static function twitter_profile_handle( $value ) {
 		return Sanitize::twitter_profile_handle( $value );
@@ -643,6 +699,7 @@ class Plugin {
 
 	/**
 	 * @since 5.0.0
+	 * @since 5.2.0 Now stores the canonical URL fully qualified.
 	 *
 	 * @param mixed $value An unsanitized value.
 	 * @return array[] The sanitized post type archive meta.
@@ -666,7 +723,14 @@ class Plugin {
 						$val = Sanitize::metadata_content( $val );
 						break;
 
-					case 'canonical':
+					case 'title_no_blog_name':
+						$val = Sanitize::boolean_integer( $val );
+						break;
+
+					case 'tw_card_type':
+						$val = Sanitize::twitter_card( $val );
+						break;
+
 					case 'social_image_url':
 						$val = \sanitize_url( $val, [ 'https', 'http' ] );
 						break;
@@ -674,6 +738,10 @@ class Plugin {
 					case 'social_image_id':
 						// Bound to social_image_url.
 						$val = $meta['social_image_url'] ? \absint( $val ) : 0;
+						break;
+
+					case 'canonical':
+						$val = self::fully_qualified_url( $val );
 						break;
 
 					case 'noindex':
@@ -684,15 +752,6 @@ class Plugin {
 
 					case 'redirect':
 						$val = Sanitize::redirect_url( $val );
-						break;
-
-					case 'title_no_blog_name':
-						$val = Sanitize::boolean_integer( $val );
-						break;
-
-					case 'tw_card_type':
-						if ( ! \in_array( $val, Meta\Twitter::get_supported_cards(), true ) )
-							$val = ''; // default
 						break;
 
 					default:

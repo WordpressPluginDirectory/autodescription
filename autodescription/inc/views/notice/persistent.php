@@ -6,15 +6,15 @@
 
 namespace The_SEO_Framework;
 
-\defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) or die;
+( \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) ) or die;
 
-use \The_SEO_Framework\Admin\Settings\Layout\HTML;
+use The_SEO_Framework\Admin\Settings\Layout\HTML;
 
-// phpcs:disable, WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
+// phpcs:disable WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2021 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2021 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -31,23 +31,6 @@ use \The_SEO_Framework\Admin\Settings\Layout\HTML;
 
 // See _output_dismissible_persistent_notices
 [ $message, $key, $args ] = $view_args;
-
-/**
- * The SEO Framework plugin
- * Copyright (C) 2015 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as published
- * by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
 
 if ( ! $message ) return;
 
@@ -104,14 +87,16 @@ vprintf(
 	'<div class="notice %s tsf-notice %s">%s%s</div>',
 	[
 		\esc_attr( $args['type'] ),
-		( $args['icon'] ? 'tsf-show-icon' : '' ),
+		$args['icon'] ? 'tsf-show-icon' : '',
 		\sprintf(
-			// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- conditionals bug.
-			( ! $args['escape'] && 0 === stripos( $message, '<p' ) ? '%s' : '<p>%s</p>' ),
-			// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- the invoker should be mindful.
-			( $args['escape'] ? \esc_html( $message ) : $message )
+			! $args['escape'] && 0 === stripos( $message, '<p' )
+				? '%s'
+				: '<p>%s</p>',
+			$args['escape']
+				? \esc_html( $message )
+				: $message, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the invoker should be mindful.
 		),
-		// phpcs:ignore, WordPress.Security.EscapeOutput.OutputNotEscaped -- they are.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- they are.
 		$button_js . $button_nojs,
 	],
 );

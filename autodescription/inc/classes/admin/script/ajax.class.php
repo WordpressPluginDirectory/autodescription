@@ -8,18 +8,22 @@ namespace The_SEO_Framework\Admin\Script;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use \The_SEO_Framework\{
+use function The_SEO_Framework\coalesce_strlen;
+
+use The_SEO_Framework\{
 	Admin,
 	Data,
 	Data\Filter\Sanitize,
-	Helper,
-	Helper\Query,
 	Meta,
+};
+use The_SEO_Framework\Helper\{
+	Headers,
+	Query,
 };
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2021 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2021 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -57,9 +61,9 @@ final class AJAX {
 	 */
 	public static function dismiss_notice() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:ignore, WordPress.Security.NonceVerification.Missing -- We require the POST data to find locally stored nonces.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- We require the POST data to find locally stored nonces.
 		$key = $_POST['tsf_dismiss_key'] ?? '';
 
 		if ( ! $key )
@@ -92,13 +96,14 @@ final class AJAX {
 	 *              2. No longer tests if settings-saving was successful.
 	 * @since 5.0.0 Removed _wp_ajax_ from the plugin name.
 	 * @since 5.1.0 No longer sends the updated value. We can assume it's updated without repercussions.
+	 * @since 5.2.0 Now stores the counter as a user preference.
 	 * @access private
 	 */
 	public static function update_counter_type() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
 		Utils::check_ajax_capability_referer( 'edit_posts' );
 
 		/**
@@ -106,20 +111,22 @@ final class AJAX {
 		 * $_POST['val'] already contains updated number.
 		 */
 		if ( isset( $_POST['val'] ) ) {
-			$value = (int) $_POST['val'];
+			$value = $_POST['val'];
 		} else {
-			$value = Data\Plugin\User::get_meta_item( 'counter_type' ) + 1;
+			$value = Data\Plugin\User::get_preference_item( 'counter_type' ) + 1;
 		}
-		$value = \absint( $value );
 
-		if ( $value > 3 )
-			$value = 0;
+		$value = Sanitize::counter_type( $value );
 
 		// Update the option and get results of action.
-		Data\Plugin\User::update_single_meta_item( Query::get_current_user_id(), 'counter_type', $value );
+		Data\Plugin\User::update_single_preference_item(
+			'counter_type',
+			$value,
+			Query::get_current_user_id(),
+		);
 
 		\wp_send_json_success();
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -148,9 +155,9 @@ final class AJAX {
 	 */
 	public static function crop_image() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer does this.
 		Utils::check_ajax_capability_referer( 'upload_files' );
 
 		if ( ! isset( $_POST['id'], $_POST['context'], $_POST['cropDetails'] ) )
@@ -191,22 +198,21 @@ final class AJAX {
 				$cropped_basename = \wp_basename( $cropped );
 				$url              = str_replace( $parent_basename, $cropped_basename, $parent_url );
 
-				// phpcs:ignore, WordPress.PHP.NoSilencedErrors -- See https://core.trac.wordpress.org/ticket/42480
+				// phpcs:ignore WordPress.PHP.NoSilencedErrors -- See https://core.trac.wordpress.org/ticket/42480
 				$size       = \function_exists( 'wp_getimagesize' ) ? \wp_getimagesize( $cropped ) : @getimagesize( $cropped );
 				$image_type = $size ? $size['mime'] : 'image/jpeg';
 
 				// Get the original image's post to pre-populate the cropped image.
 				$original_attachment  = \get_post( $attachment_id );
 				$sanitized_post_title = \sanitize_file_name( $original_attachment->post_title );
-				$use_original_title   = (
-					\strlen( trim( $original_attachment->post_title ) ) &&
-					/**
-					 * Check if the original image has a title other than the "filename" default,
-					 * meaning the image had a title when originally uploaded or its title was edited.
-					 */
-					( $parent_basename !== $sanitized_post_title ) &&
-					( pathinfo( $parent_basename, \PATHINFO_FILENAME ) !== $sanitized_post_title )
-				);
+				/**
+				 * Check if the original image has a title other than the "filename" default,
+				 * meaning the image had a title when originally uploaded or its title was edited.
+				 */
+				$use_original_title = \strlen( trim( $original_attachment->post_title ) )
+					&& ( $parent_basename !== $sanitized_post_title )
+					&& ( pathinfo( $parent_basename, \PATHINFO_FILENAME ) !== $sanitized_post_title );
+
 				$use_original_description = \strlen( trim( $original_attachment->post_content ) );
 
 				$attachment = [
@@ -236,6 +242,7 @@ final class AJAX {
 				 * @param array $metadata Attachment metadata.
 				 */
 				$metadata = \apply_filters( 'wp_ajax_cropped_attachment_metadata', $metadata );
+
 				\wp_update_attachment_metadata( $attachment_id, $metadata );
 
 				/**
@@ -252,7 +259,7 @@ final class AJAX {
 
 		\wp_send_json_success( \wp_prepare_attachment_for_js( $attachment_id ) );
 
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -263,13 +270,16 @@ final class AJAX {
 	 * @since 4.2.0 Now uses wp.ajax, instead of $.ajax
 	 * @since 5.0.0 Removed _wp_ajax_ from the plugin name.
 	 * @since 5.1.0 Now relays the 'edit_post' capability check to the reference handler.
+	 * @since 5.2.0 1. Now keeps a homepage description of `0` instead of falling back to the generated description.
+	 *              2. Now ignores a posted `"false"` flag.
+	 *              3. Now uses the homepage Open Graph and Twitter descriptions on the static front page.
 	 * @access private
 	 */
 	public static function get_post_data() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
 		$post_id = \absint( $_POST['post_id'] ?? 0 );
 
 		Utils::check_ajax_capability_referer( 'edit_post', $post_id );
@@ -291,8 +301,9 @@ final class AJAX {
 						(array) ( $_POST['get'] ?? [] ),
 					),
 					$_get_defaults,
-				)
-			)
+				),
+				'wp_validate_boolean', // jQuery.param posts boolean false as the string "false", which callbackless array_filter() keeps.
+			),
 		);
 
 		$generator_args = [ 'id' => $post_id ];
@@ -310,24 +321,30 @@ final class AJAX {
 				switch ( $g ) {
 					case 'metadescription':
 						if ( Query::is_static_front_page( $post_id ) ) {
-							$data[ $g ] = Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_description' ) )
-									   ?: Meta\Description::get_generated_description( $generator_args );
+							$data[ $g ] =
+								   coalesce_strlen( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_description' ) ) )
+								?? Meta\Description::get_generated_description( $generator_args );
 						} else {
 							$data[ $g ] = Meta\Description::get_generated_description( $generator_args );
 						}
 						break;
 					case 'ogdescription':
 						if ( Query::is_static_front_page( $post_id ) ) {
-							$data[ $g ] = Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_description' ) )
-									   ?: Meta\Open_Graph::get_generated_description( $generator_args );
+							$data[ $g ] =
+								   coalesce_strlen( Data\Plugin::get_option( 'homepage_og_description' ) )
+								?? coalesce_strlen( Data\Plugin::get_option( 'homepage_description' ) )
+								?? Meta\Open_Graph::get_generated_description( $generator_args );
 						} else {
 							$data[ $g ] = Meta\Open_Graph::get_generated_description( $generator_args );
 						}
 						break;
 					case 'twdescription':
 						if ( Query::is_static_front_page( $post_id ) ) {
-							$data[ $g ] = Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_description' ) )
-									   ?: Meta\Twitter::get_generated_description( $generator_args );
+							$data[ $g ] =
+								   coalesce_strlen( Data\Plugin::get_option( 'homepage_twitter_description' ) )
+								?? coalesce_strlen( Data\Plugin::get_option( 'homepage_og_description' ) )
+								?? coalesce_strlen( Data\Plugin::get_option( 'homepage_description' ) )
+								?? Meta\Twitter::get_generated_description( $generator_args );
 						} else {
 							$data[ $g ] = Meta\Twitter::get_generated_description( $generator_args );
 						}
@@ -338,8 +355,12 @@ final class AJAX {
 
 			case 'imageurl':
 				if ( Query::is_static_front_page( $post_id ) ) {
-					$data[ $g ] = \sanitize_url( Data\Plugin::get_option( 'homepage_social_image_url' ), [ 'https', 'http' ] )
-							   ?: Meta\Image::get_first_generated_image_url( $generator_args, 'social' );
+					$data[ $g ] =
+						\sanitize_url(
+							Data\Plugin::get_option( 'homepage_social_image_url' ),
+							[ 'https', 'http' ],
+						)
+						?: Meta\Image::get_first_generated_image_url( $generator_args, 'social' );
 				} else {
 					$data[ $g ] = Meta\Image::get_first_generated_image_url( $generator_args, 'social' );
 				}
@@ -349,7 +370,7 @@ final class AJAX {
 			'data'      => $data,
 			'processed' => $get,
 		] );
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -366,9 +387,9 @@ final class AJAX {
 	 */
 	public static function get_term_parent_slugs() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
 		Utils::check_ajax_capability_referer( 'edit_posts' );
 
 		if ( ! isset( $_POST['term_id'], $_POST['taxonomy'] ) )
@@ -390,7 +411,7 @@ final class AJAX {
 		}
 
 		\wp_send_json_success( $parent_term_slugs );
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -409,9 +430,9 @@ final class AJAX {
 	 */
 	public static function get_post_parent_slugs() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
 		Utils::check_ajax_capability_referer( 'edit_posts' );
 
 		if ( ! isset( $_POST['post_id'] ) )
@@ -443,7 +464,7 @@ final class AJAX {
 		}
 
 		\wp_send_json_success( $parent_post_slugs );
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 
 	/**
@@ -459,9 +480,9 @@ final class AJAX {
 	 */
 	public static function get_author_slug() {
 
-		Helper\Headers::clean_response_header();
+		Headers::clean_response_header();
 
-		// phpcs:disable, WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
+		// phpcs:disable WordPress.Security.NonceVerification -- check_ajax_capability_referer() does this.
 		Utils::check_ajax_capability_referer( 'edit_posts' );
 
 		if ( ! isset( $_POST['author_id'] ) )
@@ -472,13 +493,13 @@ final class AJAX {
 		if ( ! $author_id )
 			\wp_send_json_error( 'invalid_object_id' );
 
-		$author_slugs   = [];
-		$author_slugs[] = [
-			'id'   => $author_id,
-			'slug' => Data\User::get_userdata( $author_id, 'user_nicename' ),
-		];
-
-		\wp_send_json_success( $author_slugs );
-		// phpcs:enable, WordPress.Security.NonceVerification
+		// Send a sequential array of "slugs" for consistency with other slug fetchers.
+		\wp_send_json_success( [
+			[
+				'id'   => $author_id,
+				'slug' => Data\User::get_userdata( $author_id, 'user_nicename' ),
+			],
+		] );
+		// phpcs:enable WordPress.Security.NonceVerification
 	}
 }

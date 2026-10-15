@@ -8,16 +8,16 @@ namespace The_SEO_Framework\Meta\Title;
 
 \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) or die;
 
-use function \The_SEO_Framework\{
+use function The_SEO_Framework\{
 	get_query_type_from_args,
 	normalize_generation_args,
 };
 
-use \The_SEO_Framework\Data;
+use The_SEO_Framework\Data;
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2023 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2023 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -89,11 +89,11 @@ class Utils {
 	 * @since 4.1.0 Added a second parameter, $args, to help soften the burden of this method.
 	 * @since 5.0.0 1. Now handles filters with a priority of 0. Only a theoretical bug, so not in changelog.
 	 *              2. Moved from `\The_SEO_Framework\Load`.
-	 * @internal Only to be used within Meta\Title::get_bare_unfiltered_generated_title()
+	 * @internal Only to be used within Meta\Title::get_bare_generated_title()
 	 *
-	 * @param bool       $reset Whether to reset the removed filters.
-	 * @param array|null $args  The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
-	 *                          Leave null to autodetermine query.
+	 * @param bool   $reset Whether to reset the removed filters.
+	 * @param ?array $args  The query arguments. Accepts 'id', 'tax', 'pta', and 'uid'.
+	 *                      Leave null to autodetermine query.
 	 */
 	public static function remove_default_title_filters( $reset = false, $args = null ) {
 
@@ -140,12 +140,12 @@ class Utils {
 					// Only grab 10 of these. Yes, one might transform still on the 11th.
 					$it = 10;
 					$i  = 0;
-					// phpcs:ignore, WordPress.CodeAnalysis.AssignmentInCondition
+					// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
 					while ( false !== ( $priority = \has_filter( $filter, $function ) ) ) {
 						$filtered[] = [ $filter, $function, $priority ];
 						\remove_filter( $filter, $function, $priority );
 						// Some noob might've destroyed \WP_Hook. Safeguard.
-						if ( ++$i > $it ) break 1;
+						if ( ++$i > $it ) break;
 					}
 				}
 			}
@@ -157,9 +157,9 @@ class Utils {
 	 *
 	 * @since 3.1.0
 	 * @since 5.0.0 Moved from `\The_SEO_Framework\Load`.
-	 * @internal Only to be used within Meta\Title::get_bare_unfiltered_generated_title()
+	 * @internal Only to be used within Meta\Title::get_bare_generated_title()
 	 */
 	public static function reset_default_title_filters() {
-		static::remove_default_title_filters( true );
+		self::remove_default_title_filters( true );
 	}
 }

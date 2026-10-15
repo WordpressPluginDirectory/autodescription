@@ -6,25 +6,25 @@
 
 namespace The_SEO_Framework;
 
-\defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) or die;
+( \defined( 'THE_SEO_FRAMEWORK_PRESENT' ) and Helper\Template::verify_secret( $secret ) ) or die;
 
-use \The_SEO_Framework\Admin\Settings\Layout\{
+use The_SEO_Framework\Admin\Settings\Layout\{
 	Form,
 	HTML,
 	Input,
 };
-use \The_SEO_Framework\Data\Filter\Sanitize;
-use \The_SEO_Framework\Helper\{
+use The_SEO_Framework\Data\Filter\Sanitize;
+use The_SEO_Framework\Helper\{
 	Compatibility,
 	Format\Markdown,
 	Query,
 };
 
-// phpcs:disable, WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
+// phpcs:disable WordPress.WP.GlobalVariablesOverride -- This isn't the global scope.
 
 /**
  * The SEO Framework plugin
- * Copyright (C) 2016 - 2024 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
+ * Copyright (C) 2016 - 2026 Sybre Waaijer, CyberWire B.V. (https://cyberwire.nl/)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as published
@@ -59,7 +59,7 @@ switch ( $instance ) :
 						\esc_url( \admin_url( "post.php?post={$home_id}&action=edit#tsf-inpost-box" ) ),
 					),
 					[ 'a' ],
-					[ 'a_internal' => false ] // opens in new tab.
+					[ 'a_internal' => false ], // opens in new tab.
 				);
 			}
 
@@ -97,7 +97,7 @@ switch ( $instance ) :
 			 * @since 2.6.0
 			 * @param array $tabs The default tabs.
 			 */
-			(array) \apply_filters( 'the_seo_framework_homepage_settings_tabs', $tabs )
+			(array) \apply_filters( 'the_seo_framework_homepage_settings_tabs', $tabs ),
 		);
 		break;
 
@@ -117,11 +117,18 @@ switch ( $instance ) :
 		</p>
 		<?php
 		// Output these unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_title' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
-		Form::output_pixel_counter_wrap( Input::get_field_id( 'homepage_title' ), 'title', (bool) Data\Plugin::get_option( 'display_pixel_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_title' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
+		Form::output_pixel_counter_wrap(
+			Input::get_field_id( 'homepage_title' ),
+			'title',
+			(bool) Data\Plugin::get_option( 'display_pixel_counter' ),
+		);
 		?>
 		<p class=tsf-title-wrap>
-			<input type=text name="<?php Input::field_name( 'homepage_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_title' ) ) ) ?>" autocomplete=off>
+			<input type=text name="<?php Input::field_name( 'homepage_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_title' ) ) ) ?>" autocomplete=off data-tsf-proposed="">
 			<?php
 			$post_meta_title = $home_id ? Sanitize::metadata_content( Data\Plugin\Post::get_meta_item( '_genesis_title', $home_id ) ) : '';
 
@@ -131,7 +138,8 @@ switch ( $instance ) :
 					'state' => [
 						'refTitleLocked'      => false, // This field is the mother of all references.
 						'defaultTitle'        => \esc_html(
-							coalesce_strlen( $post_meta_title ) ?? Meta\Title::get_bare_generated_title( $generator_args )
+							coalesce_strlen( $post_meta_title )
+								?? Meta\Title::get_bare_generated_title( $generator_args ),
 						),
 						'_defaultTitleLocked' => (bool) \strlen( $post_meta_title ), // Underscored index because it's non-standard API.
 						'addAdditions'        => Meta\Title\Conditions::use_branding( $generator_args ),
@@ -166,11 +174,18 @@ switch ( $instance ) :
 		</p>
 		<?php
 		// Output these unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_description' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
-		Form::output_pixel_counter_wrap( Input::get_field_id( 'homepage_description' ), 'description', (bool) Data\Plugin::get_option( 'display_pixel_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_description' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
+		Form::output_pixel_counter_wrap(
+			Input::get_field_id( 'homepage_description' ),
+			'description',
+			(bool) Data\Plugin::get_option( 'display_pixel_counter' ),
+		);
 		?>
 		<p>
-			<textarea name="<?php Input::field_name( 'homepage_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_description' ); ?>" rows=3 cols=70><?= \esc_attr( Data\Plugin::get_option( 'homepage_description' ) ) ?></textarea>
+			<textarea name="<?php Input::field_name( 'homepage_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_description' ); ?>" rows=3 cols=70 data-tsf-proposed=""><?= \esc_attr( Data\Plugin::get_option( 'homepage_description' ) ) ?></textarea>
 			<?php
 			Input::output_js_description_data(
 				Input::get_field_id( 'homepage_description' ),
@@ -178,9 +193,14 @@ switch ( $instance ) :
 					'state' => [
 						'defaultDescription' => \esc_html(
 							coalesce_strlen(
-								$home_id ? Sanitize::metadata_content( Data\Plugin\Post::get_meta_item( '_genesis_description', $home_id ) ) : ''
+								$home_id
+									? Sanitize::metadata_content( Data\Plugin\Post::get_meta_item(
+										'_genesis_description',
+										$home_id,
+									) )
+									: '',
 							)
-							?? Meta\Description::get_generated_description( $generator_args )
+							?? Meta\Description::get_generated_description( $generator_args ),
 						),
 					],
 				],
@@ -191,7 +211,7 @@ switch ( $instance ) :
 
 		if ( $home_id && \strlen( Data\Plugin\Post::get_meta_item( '_genesis_description', $home_id ) ) ) {
 			HTML::description(
-				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		break;
@@ -199,14 +219,14 @@ switch ( $instance ) :
 	case 'additions':
 		// Fetches escaped title parts.
 		$_example_title = \esc_html(
-			Meta\Title::get_bare_custom_title( $generator_args )
-			?: Meta\Title::get_bare_generated_title( $generator_args )
+			   Meta\Title::get_bare_custom_title( $generator_args )
+			?: Meta\Title::get_bare_generated_title( $generator_args ),
 		);
 		// On JS: The 'Untitled' title will disappear, this is intentional. On no-JS one will see 'Untitled'.
 		// TODO: Deprecate no-JS support? WordPress doesn't function without JS since 5.0 anyway...
 		$_example_blogname  = \esc_html(
-			Meta\Title::get_addition_for_front_page()
-			?: Meta\Title::get_untitled_title()
+			   Meta\Title::get_addition_for_front_page()
+			?: Meta\Title::get_untitled_title(),
 		);
 		$_example_separator = \esc_html( Meta\Title::get_separator() );
 
@@ -221,7 +241,7 @@ switch ( $instance ) :
 			</label>
 		</p>
 		<p>
-			<input type=text name="<?php Input::field_name( 'homepage_title_tagline' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_title_tagline' ); ?>" placeholder="<?= \esc_html( Sanitize::metadata_content( Data\Blog::get_filtered_blog_description() ) ) ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_title_tagline' ) ) ) ?>" autocomplete=off>
+			<input type=text name="<?php Input::field_name( 'homepage_title_tagline' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_title_tagline' ); ?>" placeholder="<?= \esc_html( Sanitize::metadata_content( Data\Blog::get_filtered_blog_description() ) ) ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_title_tagline' ) ) ) ?>" autocomplete=off data-tsf-proposed="<?= \esc_attr( Sanitize::metadata_content( Data\Blog::get_filtered_blog_description() ) ) ?>">
 		</p>
 
 		<div class=tsf-title-tagline-toggle>
@@ -247,7 +267,7 @@ switch ( $instance ) :
 					<label for="<?php Input::field_id( 'home_title_location_left' ); ?>">
 						<span><?php \esc_html_e( 'Left:', 'autodescription' ); ?></span>
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput -- $example_left is already escaped.
+						// phpcs:ignore WordPress.Security.EscapeOutput -- $example_left is already escaped.
 						echo HTML::code_wrap_noesc( $example_left );
 						?>
 					</label>
@@ -257,7 +277,7 @@ switch ( $instance ) :
 					<label for="<?php Input::field_id( 'home_title_location_right' ); ?>">
 						<span><?php \esc_html_e( 'Right:', 'autodescription' ); ?></span>
 						<?php
-						// phpcs:ignore, WordPress.Security.EscapeOutput -- $example_right is already escaped.
+						// phpcs:ignore WordPress.Security.EscapeOutput -- $example_right is already escaped.
 						echo HTML::code_wrap_noesc( $example_right );
 						?>
 					</label>
@@ -269,8 +289,8 @@ switch ( $instance ) :
 
 	case 'social':
 		/* translators: %s = default option value */
-		$_default_i18n     = \__( 'Default (%s)', 'autodescription' );
-		$tw_suported_cards = Meta\Twitter::get_supported_cards();
+		$_default_i18n      = \__( 'Default (%s)', 'autodescription' );
+		$tw_supported_cards = Meta\Twitter::get_supported_cards();
 
 		$custom_title    = '';
 		$custom_desc     = '';
@@ -292,7 +312,7 @@ switch ( $instance ) :
 			$custom_tw_desc  = Sanitize::metadata_content( Data\Plugin\Post::get_meta_item( '_twitter_description', $home_id ) );
 
 			$custom_tw_card  = Data\Plugin\Post::get_meta_item( '_tsf_twitter_card_type', $home_id );
-			$tw_card_default = \in_array( $custom_tw_card, $tw_suported_cards, true )
+			$tw_card_default = \in_array( $custom_tw_card, $tw_supported_cards, true )
 				? $custom_tw_card
 				: Meta\Twitter::get_generated_card_type( $generator_args );
 
@@ -309,15 +329,15 @@ switch ( $instance ) :
 				'og' => [
 					'state' => [
 						'defaultTitle' => \esc_html(
-							coalesce_strlen( $custom_og_title )
+							   coalesce_strlen( $custom_og_title )
 							?? coalesce_strlen( $custom_title )
-							?? Meta\Open_Graph::get_generated_title( $generator_args )
+							?? Meta\Open_Graph::get_generated_title( $generator_args ),
 						),
 						'addAdditions' => Meta\Title\Conditions::use_branding( $generator_args, 'og' ),
 						'defaultDesc'  => \esc_html(
-							coalesce_strlen( $custom_og_desc )
+							   coalesce_strlen( $custom_og_desc )
 							?? coalesce_strlen( $custom_desc )
-							?? Meta\Open_Graph::get_generated_description( $generator_args )
+							?? Meta\Open_Graph::get_generated_description( $generator_args ),
 						),
 						'titlePhLock'  => (bool) \strlen( $custom_og_title ),
 						'descPhLock'   => (bool) \strlen( $custom_og_desc ),
@@ -326,17 +346,17 @@ switch ( $instance ) :
 				'tw' => [
 					'state' => [
 						'defaultTitle' => \esc_html(
-							coalesce_strlen( $custom_tw_title )
+							   coalesce_strlen( $custom_tw_title )
 							?? coalesce_strlen( $custom_og_title )
 							?? coalesce_strlen( $custom_title )
-							?? Meta\Twitter::get_generated_title( $generator_args )
+							?? Meta\Twitter::get_generated_title( $generator_args ),
 						),
 						'addAdditions' => Meta\Title\Conditions::use_branding( $generator_args, 'twitter' ),
 						'defaultDesc'  => \esc_html(
-							coalesce_strlen( $custom_tw_desc )
+							   coalesce_strlen( $custom_tw_desc )
 							?? coalesce_strlen( $custom_og_desc )
 							?? coalesce_strlen( $custom_desc )
-							?? Meta\Twitter::get_generated_description( $generator_args )
+							?? Meta\Twitter::get_generated_description( $generator_args ),
 						),
 						'titlePhLock'  => (bool) \strlen( $custom_tw_title ),
 						'descPhLock'   => (bool) \strlen( $custom_tw_desc ),
@@ -353,15 +373,18 @@ switch ( $instance ) :
 		</p>
 		<?php
 		// Output this unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_og_title' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_og_title' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
 		?>
 		<p>
-			<input type=text name="<?php Input::field_name( 'homepage_og_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_og_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_og_title' ) ) ) ?>" autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=ogTitle>
+			<input type=text name="<?php Input::field_name( 'homepage_og_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_og_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_og_title' ) ) ) ?>" autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=ogTitle data-tsf-proposed="">
 		</p>
 		<?php
 		if ( \strlen( $custom_og_title ) ) {
 			HTML::description(
-				\__( 'Note: The title placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The title placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		?>
@@ -373,15 +396,18 @@ switch ( $instance ) :
 		</p>
 		<?php
 		// Output this unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_og_description' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_og_description' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
 		?>
 		<p>
-			<textarea name="<?php Input::field_name( 'homepage_og_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_og_description' ); ?>" rows=3 cols=70 autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=ogDesc><?= \esc_attr( Data\Plugin::get_option( 'homepage_og_description' ) ) ?></textarea>
+			<textarea name="<?php Input::field_name( 'homepage_og_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_og_description' ); ?>" rows=3 cols=70 autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=ogDesc data-tsf-proposed=""><?= \esc_attr( Data\Plugin::get_option( 'homepage_og_description' ) ) ?></textarea>
 		</p>
 		<?php
 		if ( \strlen( $custom_og_desc ) ) {
 			HTML::description(
-				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		?>
@@ -389,40 +415,46 @@ switch ( $instance ) :
 
 		<p>
 			<label for="<?php Input::field_id( 'homepage_twitter_title' ); ?>" class=tsf-toblock>
-				<strong><?php \esc_html_e( 'Twitter Title', 'autodescription' ); ?></strong>
+				<strong><?php \esc_html_e( 'Twitter Card Title', 'autodescription' ); ?></strong>
 			</label>
 		</p>
 		<?php
 		// Output this unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_twitter_title' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_twitter_title' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
 		?>
 		<p>
-			<input type=text name="<?php Input::field_name( 'homepage_twitter_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_twitter_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_twitter_title' ) ) ) ?>" autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=twTitle>
+			<input type=text name="<?php Input::field_name( 'homepage_twitter_title' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_twitter_title' ); ?>" value="<?= \esc_html( Sanitize::metadata_content( Data\Plugin::get_option( 'homepage_twitter_title' ) ) ) ?>" autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=twTitle data-tsf-proposed="">
 		</p>
 		<?php
 		if ( \strlen( $custom_og_title ) || \strlen( $custom_tw_title ) ) {
 			HTML::description(
-				\__( 'Note: The title placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The title placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		?>
 
 		<p>
 			<label for="<?php Input::field_id( 'homepage_twitter_description' ); ?>" class=tsf-toblock>
-				<strong><?php \esc_html_e( 'Twitter Description', 'autodescription' ); ?></strong>
+				<strong><?php \esc_html_e( 'Twitter Card Description', 'autodescription' ); ?></strong>
 			</label>
 		</p>
 		<?php
 		// Output this unconditionally, with inline CSS attached to allow reacting on settings.
-		Form::output_character_counter_wrap( Input::get_field_id( 'homepage_twitter_description' ), (bool) Data\Plugin::get_option( 'display_character_counter' ) );
+		Form::output_character_counter_wrap(
+			Input::get_field_id( 'homepage_twitter_description' ),
+			(bool) Data\Plugin::get_option( 'display_character_counter' ),
+		);
 		?>
 		<p>
-			<textarea name="<?php Input::field_name( 'homepage_twitter_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_twitter_description' ); ?>" rows=3 cols=70 autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=twDesc><?= \esc_attr( Data\Plugin::get_option( 'homepage_twitter_description' ) ) ?></textarea>
+			<textarea name="<?php Input::field_name( 'homepage_twitter_description' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_twitter_description' ); ?>" rows=3 cols=70 autocomplete=off data-tsf-social-group=homepage_social_settings data-tsf-social-type=twDesc data-tsf-proposed=""><?= \esc_attr( Data\Plugin::get_option( 'homepage_twitter_description' ) ) ?></textarea>
 		</p>
 		<?php
 		if ( \strlen( $custom_og_desc ) || \strlen( $custom_tw_desc ) ) {
 			HTML::description(
-				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The description placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		?>
@@ -432,38 +464,39 @@ switch ( $instance ) :
 				<strong><?php \esc_html_e( 'Twitter Card Type', 'autodescription' ); ?></strong>
 				<?php
 				HTML::make_info(
-					\__( 'The Twitter Card type is used to determine whether an image appears on the side or as a large cover. This affects X, but also other social platforms like Discord.', 'autodescription' ),
-					'https://developer.twitter.com/en/docs/twitter-for-websites/cards/overview/abouts-cards',
+					\__( 'The Twitter Card type controls the link preview layout. On X, the summary card shows a small thumbnail beside truncated title and description; the large-image card overlays the title on the image with no description. On Discord, the image appears small at the side or large below; both card types show the description.', 'autodescription' ),
+					'https://kb.theseoframework.com/?p=451#card-types',
 				);
 				?>
 			</label>
 		</p>
 		<p>
-			<?php
-			// phpcs:disable, WordPress.Security.EscapeOutput -- make_single_select_form() escapes.
-			echo Form::make_single_select_form( [
-				'id'       => Input::get_field_id( 'homepage_twitter_card_type' ),
-				'class'    => 'tsf-select-block',
-				'name'     => Input::get_field_name( 'homepage_twitter_card_type' ),
-				'label'    => '',
-				'options'  => array_merge(
-					[ '' => \sprintf( $_default_i18n, $tw_card_default ) ],
-					array_combine( $tw_suported_cards, $tw_suported_cards ),
-				),
-				'selected' => Data\Plugin::get_option( 'homepage_twitter_card_type' ),
-				'data'     => [
-					'defaultI18n'   => $_default_i18n,
-					'defaultValue'  => $tw_card_default,
-					'defaultLocked' => (bool) $custom_tw_card,
-				],
-			] );
-			// phpcs:enable, WordPress.Security.EscapeOutput
-			?>
+			<div class=tsf-select-block>
+				<?php
+				// phpcs:disable WordPress.Security.EscapeOutput -- make_single_select_form() escapes.
+				echo Form::make_single_select_form( [
+					'id'       => Input::get_field_id( 'homepage_twitter_card_type' ),
+					'name'     => Input::get_field_name( 'homepage_twitter_card_type' ),
+					'label'    => '',
+					'options'  => array_merge(
+						[ '' => \sprintf( $_default_i18n, $tw_card_default ) ],
+						array_combine( $tw_supported_cards, $tw_supported_cards ),
+					),
+					'selected' => Data\Plugin::get_option( 'homepage_twitter_card_type' ),
+					'data'     => [
+						'defaultI18n'   => $_default_i18n,
+						'defaultValue'  => $tw_card_default,
+						'defaultLocked' => (bool) $custom_tw_card,
+					],
+				] );
+				// phpcs:enable WordPress.Security.EscapeOutput
+				?>
+			</div>
 		</p>
 		<?php
 		if ( $custom_tw_card ) {
 			HTML::description(
-				\__( 'Note: The default Twitter Card Type is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The default Twitter Card Type is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		?>
@@ -484,20 +517,20 @@ switch ( $instance ) :
 			</label>
 		</p>
 		<p>
-			<input class=large-text type=url name="<?php Input::field_name( 'homepage_social_image_url' ); ?>" id=tsf_homepage_socialimage-url placeholder="<?= \esc_url( $image_placeholder ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_social_image_url' ) ) ?>">
+			<input class=large-text type=url name="<?php Input::field_name( 'homepage_social_image_url' ); ?>" id=tsf_homepage_socialimage-url placeholder="<?= \esc_url( $image_placeholder ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_social_image_url' ) ) ?>" data-tsf-proposed="<?= \esc_url( $image_placeholder ) ?>">
 			<input type=hidden name="<?php Input::field_name( 'homepage_social_image_id' ); ?>" id=tsf_homepage_socialimage-id value="<?= \absint( Data\Plugin::get_option( 'homepage_social_image_id' ) ) ?>" disabled class=tsf-enable-media-if-js>
 		</p>
 		<p class=hide-if-no-tsf-js>
 			<?php
-			// phpcs:disable, WordPress.Security.EscapeOutput -- get_image_uploader_form escapes. (phpcs breaks here, so we use disable)
+			// phpcs:disable WordPress.Security.EscapeOutput -- get_image_uploader_form escapes. (phpcs breaks here, so we use disable)
 			echo Form::get_image_uploader_form( [ 'id' => 'tsf_homepage_socialimage' ] );
-			// phpcs:enable, WordPress.Security.EscapeOutput
+			// phpcs:enable WordPress.Security.EscapeOutput
 			?>
 		</p>
 		<?php
 		if ( $custom_image ) {
 			HTML::description(
-				\__( 'Note: The image placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' )
+				\__( 'Note: The image placeholder is fetched from the Page SEO Settings on the homepage.', 'autodescription' ),
 			);
 		}
 		break;
@@ -557,7 +590,7 @@ switch ( $instance ) :
 			</label>
 		</p>
 		<p>
-			<input type=url name="<?php Input::field_name( 'homepage_canonical' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_canonical' ); ?>" placeholder="<?= \esc_url( $default_canonical ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_canonical' ) ) ?>" autocomplete=off>
+			<input type=url name="<?php Input::field_name( 'homepage_canonical' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_canonical' ); ?>" placeholder="<?= \esc_url( $default_canonical ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_canonical' ) ) ?>" autocomplete=off data-tsf-proposed="<?= \esc_url( $default_canonical ) ?>">
 		</p>
 
 		<hr>
@@ -576,7 +609,7 @@ switch ( $instance ) :
 					\esc_url( \admin_url( "post.php?post=$home_id&action=edit#tsf-inpost-box" ) ),
 					\esc_attr_x( 'Edit homepage page settings', 'Bear with me: the homepage can be edited globally, or via its page. Thus "homepage page".', 'autodescription' ),
 					\esc_html__( 'Overwritten by page settings', 'autodescription' ),
-				)
+				),
 			);
 		}
 
@@ -701,7 +734,7 @@ switch ( $instance ) :
 			</label>
 		</p>
 		<p>
-			<input type=url name="<?php Input::field_name( 'homepage_redirect' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_redirect' ); ?>" placeholder="<?= \esc_url( $redirect_post ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_redirect' ) ) ?>" autocomplete=off>
+			<input type=url name="<?php Input::field_name( 'homepage_redirect' ); ?>" class=large-text id="<?php Input::field_id( 'homepage_redirect' ); ?>" placeholder="<?= \esc_url( $redirect_post ) ?>" value="<?= \esc_url( Data\Plugin::get_option( 'homepage_redirect' ) ) ?>" autocomplete=off data-tsf-proposed="<?= \esc_url( $redirect_post ) ?>">
 		</p>
 		<?php
 endswitch;
